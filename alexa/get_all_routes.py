@@ -27,11 +27,13 @@ all_routes = []
 for agency_id, routes in response.json()['data'].items():
     for route in routes:
         name = {
-            "value": route["long_name"],
+            "name": {
+                "value": route["long_name"],
+            }
         }
 
         if route["short_name"] != "" :
-            name["synonyms"] = [ route["short_name"] ]
+            name["name"]["synonyms"] = [ route["short_name"] ]
 
         all_routes.append(name)
 
