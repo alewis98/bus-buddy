@@ -25,7 +25,7 @@ def on_intent(intent_request, session):
     return build_response(text)
 
 
-def main(event, context):  
+def lambda_handler(event, context):  
     if event["request"]["type"] == "IntentRequest":
         return on_intent(event["request"], event["session"])
     elif event["request"]["type"] == "LaunchRequest":
