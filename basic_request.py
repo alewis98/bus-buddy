@@ -1,6 +1,8 @@
 import requests
 from pprint import pprint
 from math import hypot
+from datetime import datetime
+import dateutil.parser
 
 # request types
 AGENCIES = "agencies"
@@ -49,7 +51,7 @@ def get_route(agency_id, route_name, geo_area=None):
 
     routes = response.json()['data'][agency_id]
 
-    route_name = route.lower()
+    route_name = route_name.lower()
     for route in routes:
         if route['long_name'].lower() == route_name:
             return route
@@ -81,7 +83,12 @@ def get_arrival_estimates(agency_id, routes=None, stops=None):
     payload = [x for x in payload if x is not None]
 
     response = requests.get(api_url + ARRIVAL_ESTIMATES, headers=headers, params=payload)
-    return response.json()['data']
+    return response.json()['data'][0]['arrivals']
+
+
+def get_arrival_time_estimates(arrivals):
+    now = datetime.now()
+    return sorted([dateutil.parser.parse(arrival['arrival_at']).replace(tzinfo=None) - now for arrival in arrivals])
 
 
 # coordinates for Whyburn: 38.0294814,-78.5193463|1000
@@ -167,5 +174,18 @@ nearest_stop = get_nearest_stop(agency_id, geo_area)
 print("Nearest stop:", nearest_stop['name'])
 
 estimates = get_arrival_estimates(agency_id, routes=[route['route_id']], stops=[nearest_stop['stop_id']])
+# estimates = [{'arrival_at': '2019-03-23T01:08:16-04:00',
+#                 'route_id': '4003286',
+#                 'type': 'vehicle-based',
+#                 'vehicle_id': '4014853'},
+#                {'arrival_at': '2019-03-23T01:33:48-04:00',
+#                 'route_id': '4003286',
+#                 'type': 'vehicle-based',
+#                 'vehicle_id': '4016897'},
+#                {'arrival_at': '2019-03-23T01:52:20-04:00',
+#                 'route_id': '4003286',
+#                 'type': 'vehicle-based',
+#                 'vehicle_id': '4014853'}]
+arrival_times = get_arrival_time_estimates(estimates)
 print("Arrival estimates:")
-pprint(estimates)
+pprint([int(time.total_seconds()/60) for time in arrival_times])
