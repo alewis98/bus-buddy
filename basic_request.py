@@ -1,4 +1,5 @@
 import requests
+import json
 from pprint import pprint
 from math import hypot
 from datetime import datetime
@@ -18,9 +19,20 @@ headers = {
 }
 
 
-def build_geo_area(longitude, latitude, radius):
+def build_geo_area(latitude, longitude, radius):
     # latitude, longitude|radius (meters)
-    return str(longitude) + "," + str(latitude) + "|" + str(radius)
+    return str(latitude) + "," + str(longitude) + "|" + str(radius)
+
+
+# coordinates for Whyburn: 38.0294814,-78.5193463|1000
+latitude = 38.0294814
+longitude = -78.5193463
+radius = 1000
+# bus_line = "Northline"
+# geo_area = build_geo_area(latitude, longitude, radius)
+
+use_cached_requests = True
+
 
 
 def get_agency(geo_area=None, agencies=None):
@@ -69,8 +81,10 @@ def get_nearest_stop(agency_id, geo_area):
     response = requests.get(api_url + STOPS, headers=headers, params=payload)
     stops = response.json()['data']
 
-    closest_stop = sorted(stops, key=lambda x: hypot(x['location']['lat'] - latitude, x['location']['lng'] - longitude))[0]
+    print("STOPS:", stops)
+    print("There are", len(stops), "stops")
 
+    closest_stop = sorted(stops, key=lambda x: hypot(x['location']['lat'] - latitude, x['location']['lng'] - longitude))[0]
     return closest_stop
 
 
@@ -82,7 +96,10 @@ def get_arrival_estimates(agency_id, routes=None, stops=None):
                 ]
     payload = [x for x in payload if x is not None]
 
+    print("Arrival Payload", payload)
+
     response = requests.get(api_url + ARRIVAL_ESTIMATES, headers=headers, params=payload)
+    print("Arrival Response:", response)
     return response.json()['data'][0]['arrivals']
 
 
@@ -91,102 +108,222 @@ def get_arrival_time_estimates(arrivals):
     return sorted([dateutil.parser.parse(arrival['arrival_at']).replace(tzinfo=None) - now for arrival in arrivals])
 
 
-# coordinates for Whyburn: 38.0294814,-78.5193463|1000
-latitude = 38.0294814
-longitude = -78.5193463
-radius = 1000
-bus_line = "Northline"
-geo_area = build_geo_area(latitude, longitude, radius)
+def format_time(arrival):
+    seconds = int(arrival.total_seconds())
+    minutes = int(seconds // 60)
+    hours   = int(minutes // 60)
+    if minutes == 0:
+        return "is arriving now"
 
-use_cached_requests = True
+    minutes = minutes % 60
 
-if use_cached_requests:
-    agency_id = '347'
-    route = {'agency_id': 347,
- 'color': 'ef83f2',
- 'description': '',
- 'is_active': True,
- 'is_hidden': False,
- 'long_name': 'Northline',
- 'route_id': '4003286',
- 'segments': [['540416931', 'forward'],
-              ['549906078', 'backward'],
-              ['581170961', 'backward'],
-              ['603002991', 'forward'],
-              ['606885185', 'forward'],
-              ['620186348', 'forward'],
-              ['623754453', 'forward'],
-              ['624430590', 'forward'],
-              ['626981847', 'backward'],
-              ['628961367', 'backward'],
-              ['644727345', 'forward'],
-              ['647516646', 'forward'],
-              ['650597156', 'forward'],
-              ['679296756', 'forward'],
-              ['685478620', 'forward'],
-              ['720756167', 'backward'],
-              ['732168762', 'forward'],
-              ['734413457', 'forward'],
-              ['767465664', 'forward'],
-              ['787155905', 'backward'],
-              ['789247268', 'forward']],
- 'short_name': '',
- 'stops': ['4123890',
-           '4123882',
-           '4123886',
-           '4123994',
-           '4178522',
-           '4229092',
-           '4178524',
-           '4209050',
-           '4209054',
-           '4209058',
-           '4148110',
-           '4137602',
-           '4209066',
-           '4123970',
-           '4123962',
-           '4221190',
-           '4123774',
-           '4123770',
-           '4123978',
-           '4123966',
-           '4124058',
-           '4123982',
-           '4123826',
-           '4123842',
-           '4209056',
-           '4209060',
-           '4209052',
-           '4123990',
-           '4123758',
-           '4123754',
-           '4124042'],
- 'text_color': 'FFFFFF',
- 'type': 'bus',
- 'url': ''}
-    nearest_stop = {'code': '040', 'description': '', 'url': '', 'parent_station_id': None, 'agency_ids': ['347'], 'station_id': None, 'location_type': 'stop', 'location': {'lat': 38.029349, 'lng': -78.519545}, 'stop_id': '4123890', 'routes': ['4003286', '4011564'], 'name': 'Hereford Dr @ Runk Dining Hall'}
-    estimates = [{'arrival_at': '2019-03-23T01:08:16-04:00',
-    'route_id': '4003286',
-    'type': 'vehicle-based',
-    'vehicle_id': '4014853'},
-    {'arrival_at': '2019-03-23T01:33:48-04:00',
-    'route_id': '4003286',
-    'type': 'vehicle-based',
-    'vehicle_id': '4016897'},
-    {'arrival_at': '2019-03-23T01:52:20-04:00',
-    'route_id': '4003286',
-    'type': 'vehicle-based',
-    'vehicle_id': '4014853'}]
-else:
-    agency = get_agency(geo_area=geo_area)
-    agency_id = agency['agency_id']
-    route = get_route(agency_id, bus_line)
-    nearest_stop = get_nearest_stop(agency_id, geo_area)
-    estimates = get_arrival_estimates(agency_id, routes=[route['route_id']], stops=[nearest_stop['stop_id']])
-    arrival_times = get_arrival_time_estimates(estimates)
+    text = "arrives in "
+    if hours > 0:
+        text += str(hours) + " hours " if hours > 1 else " hour "
+        if minutes > 0:
+            text += "and "
 
-print("Agency id:", agency_id)
-print("Route:", route['long_name'])
-print("Nearest stop:", nearest_stop['name'])
-print("Arrival estimates:", [int(time.total_seconds()/60) for time in arrival_times])
+    if minutes > 0:
+        text += str(minutes) + " minutes" if minutes > 1 else " minute"
+    return text
+
+
+def get_arrival_text(arrival_times):
+    text = "The next bus " + format_time(arrival_times[0])
+    for i in range(1, len(arrival_times)):
+        text += "\nAnother bus " + format_time(arrival_times[i])
+    return text
+
+
+def run_test():
+    if use_cached_requests:
+        agency_id = '347'
+        route = {'agency_id': 347,
+        'color': 'ef83f2',
+        'description': '',
+        'is_active': True,
+        'is_hidden': False,
+        'long_name': 'Northline',
+        'route_id': '4003286',
+        'segments': [['540416931', 'forward'],
+                    ['549906078', 'backward'],
+                    ['581170961', 'backward'],
+                    ['603002991', 'forward'],
+                    ['606885185', 'forward'],
+                    ['620186348', 'forward'],
+                    ['623754453', 'forward'],
+                    ['624430590', 'forward'],
+                    ['626981847', 'backward'],
+                    ['628961367', 'backward'],
+                    ['644727345', 'forward'],
+                    ['647516646', 'forward'],
+                    ['650597156', 'forward'],
+                    ['679296756', 'forward'],
+                    ['685478620', 'forward'],
+                    ['720756167', 'backward'],
+                    ['732168762', 'forward'],
+                    ['734413457', 'forward'],
+                    ['767465664', 'forward'],
+                    ['787155905', 'backward'],
+                    ['789247268', 'forward']],
+        'short_name': '',
+        'stops': ['4123890',
+                '4123882',
+                '4123886',
+                '4123994',
+                '4178522',
+                '4229092',
+                '4178524',
+                '4209050',
+                '4209054',
+                '4209058',
+                '4148110',
+                '4137602',
+                '4209066',
+                '4123970',
+                '4123962',
+                '4221190',
+                '4123774',
+                '4123770',
+                '4123978',
+                '4123966',
+                '4124058',
+                '4123982',
+                '4123826',
+                '4123842',
+                '4209056',
+                '4209060',
+                '4209052',
+                '4123990',
+                '4123758',
+                '4123754',
+                '4124042'],
+        'text_color': 'FFFFFF',
+        'type': 'bus',
+        'url': ''}
+        nearest_stop = {'code': '040', 'description': '', 'url': '', 'parent_station_id': None, 'agency_ids': ['347'], 'station_id': None, 'location_type': 'stop', 'location': {'lat': 38.029349, 'lng': -78.519545}, 'stop_id': '4123890', 'routes': ['4003286', '4011564'], 'name': 'Hereford Dr @ Runk Dining Hall'}
+        estimates = [{'arrival_at': '2019-03-23T01:08:16-04:00',
+        'route_id': '4003286',
+        'type': 'vehicle-based',
+        'vehicle_id': '4014853'},
+        {'arrival_at': '2019-03-23T01:33:48-04:00',
+        'route_id': '4003286',
+        'type': 'vehicle-based',
+        'vehicle_id': '4016897'},
+        {'arrival_at': '2019-03-23T01:52:20-04:00',
+        'route_id': '4003286',
+        'type': 'vehicle-based',
+        'vehicle_id': '4014853'}]
+    else:
+        agency = get_agency(geo_area=geo_area)
+        agency_id = agency['agency_id']
+        route = get_route(agency_id, bus_line)
+        nearest_stop = get_nearest_stop(agency_id, geo_area)
+        estimates = get_arrival_estimates(agency_id, routes=[route['route_id']], stops=[nearest_stop['stop_id']])
+        arrival_times = get_arrival_time_estimates(estimates)
+
+    print("Agency id:", agency_id)
+    print("Route:", route['long_name'])
+    print("Nearest stop:", nearest_stop['name'])
+    print("Arrival estimates:", [int(time.total_seconds()/60) for time in arrival_times])
+
+
+def build_response(text):
+    response = {
+        'version': '1.0',
+        'response': {
+            'outputSpeech': {
+                'type': 'PlainText',
+                'text': text,
+            }
+        }
+    }
+    return response
+
+
+def on_launch(intent_request, session):
+    return build_response("Welcome to Bus Buddy")
+
+
+def on_intent(intent_request, session):
+    intent = intent_request["intent"]
+    if intent["name"] == "GetNextBus":
+        values = intent["slots"]["bus_line"]["resolutions"]["resolutionsPerAuthority"]["values"]
+        geo_area = build_geo_area(latitude, longitude, radius)
+        agency_id = get_agency(geo_area)['agency_id']
+        matched_route = None
+        for value in values:
+            route = get_route(agency_id=agency_id, route_name=value['name'])
+            if route and route['agency_id'] == agency_id:
+                matched_route = route
+                break
+        if matched_route:
+            nearest_stop = get_nearest_stop(agency_id, geo_area)
+            estimates = get_arrival_estimates(agency_id, routes=matched_route['route_id'], stops=[nearest_stop['stop_id']])
+            arrival_times = get_arrival_time_estimates(estimates)
+            text = get_arrival_text(arrival_times)
+        else:
+            text = "No bus found"
+    else:
+        raise ValueError("Invalid intent")
+    return build_response(text)
+
+
+def build_response_google(text):
+    return {'fulfillmentText': text}
+
+
+def on_intent_google(intent_request):
+    intent = intent_request["queryResult"]["intent"]
+    if intent['displayName'] == "GetNextBus":
+        params = intent_request["queryResult"]["parameters"]
+        bus_line = params['bus_line']
+        print("Bus line:", bus_line)
+        geo_area = build_geo_area(latitude, longitude, radius)
+        try:
+            agency = get_agency(geo_area=geo_area)
+            print("AGENCY:", agency)
+            agency_id = agency['agency_id']
+        except:
+            agency_id = '347'
+        print("Agency ID:", agency_id)
+        route = get_route(agency_id=agency_id, route_name=bus_line)
+        print("Route:", route)
+        matched_route = route if route and route['agency_id'] == int(agency_id) else None
+        print("Matched route:", matched_route)
+        if matched_route:
+            nearest_stop = get_nearest_stop(agency_id, geo_area)
+            print("Nearest stop:", nearest_stop)
+            estimates = get_arrival_estimates(agency_id, routes=[matched_route['route_id']], stops=[nearest_stop['stop_id']])
+            print("Esimates:", estimates)
+            arrival_times = get_arrival_time_estimates(estimates)
+            text = get_arrival_text(arrival_times)
+        else:
+            text = "No bus found"
+    else:
+        raise ValueError("Invalid intent")
+    return build_response_google(text)
+
+def lambda_handler(event):
+    if event["request"]["type"] == "IntentRequest":
+        return on_intent(event["request"], event["session"])
+    elif event["request"]["type"] == "LaunchRequest":
+        return on_launch(event["request"], event["session"])
+    else:
+        return build_response("I think an error occurred")
+
+
+def results(request):
+    request_json = request.get_json()
+    params = request_json.get('queryResult').get('parameters')
+    if params['request_type'] == "where":
+        return {'fulfillmentText': 'WHERE YOU AT ' + params['bus_line']}
+    elif params['request_type'] == "when":
+        return on_intent_google(request_json)
+    else:
+        return build_response_google("We've lost the " + params['bus_line'])
+
+
+def handler(request):
+    # return response
+    return json.dumps(results(request))
