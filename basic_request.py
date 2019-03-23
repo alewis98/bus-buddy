@@ -98,94 +98,95 @@ radius = 1000
 bus_line = "Northline"
 geo_area = build_geo_area(latitude, longitude, radius)
 
-agency = get_agency(geo_area=geo_area)
-agency_id = agency['agency_id']
-# agency_id = '347'
+use_cached_requests = True
+
+if use_cached_requests:
+    agency_id = '347'
+    route = {'agency_id': 347,
+ 'color': 'ef83f2',
+ 'description': '',
+ 'is_active': True,
+ 'is_hidden': False,
+ 'long_name': 'Northline',
+ 'route_id': '4003286',
+ 'segments': [['540416931', 'forward'],
+              ['549906078', 'backward'],
+              ['581170961', 'backward'],
+              ['603002991', 'forward'],
+              ['606885185', 'forward'],
+              ['620186348', 'forward'],
+              ['623754453', 'forward'],
+              ['624430590', 'forward'],
+              ['626981847', 'backward'],
+              ['628961367', 'backward'],
+              ['644727345', 'forward'],
+              ['647516646', 'forward'],
+              ['650597156', 'forward'],
+              ['679296756', 'forward'],
+              ['685478620', 'forward'],
+              ['720756167', 'backward'],
+              ['732168762', 'forward'],
+              ['734413457', 'forward'],
+              ['767465664', 'forward'],
+              ['787155905', 'backward'],
+              ['789247268', 'forward']],
+ 'short_name': '',
+ 'stops': ['4123890',
+           '4123882',
+           '4123886',
+           '4123994',
+           '4178522',
+           '4229092',
+           '4178524',
+           '4209050',
+           '4209054',
+           '4209058',
+           '4148110',
+           '4137602',
+           '4209066',
+           '4123970',
+           '4123962',
+           '4221190',
+           '4123774',
+           '4123770',
+           '4123978',
+           '4123966',
+           '4124058',
+           '4123982',
+           '4123826',
+           '4123842',
+           '4209056',
+           '4209060',
+           '4209052',
+           '4123990',
+           '4123758',
+           '4123754',
+           '4124042'],
+ 'text_color': 'FFFFFF',
+ 'type': 'bus',
+ 'url': ''}
+    nearest_stop = {'code': '040', 'description': '', 'url': '', 'parent_station_id': None, 'agency_ids': ['347'], 'station_id': None, 'location_type': 'stop', 'location': {'lat': 38.029349, 'lng': -78.519545}, 'stop_id': '4123890', 'routes': ['4003286', '4011564'], 'name': 'Hereford Dr @ Runk Dining Hall'}
+    estimates = [{'arrival_at': '2019-03-23T01:08:16-04:00',
+    'route_id': '4003286',
+    'type': 'vehicle-based',
+    'vehicle_id': '4014853'},
+    {'arrival_at': '2019-03-23T01:33:48-04:00',
+    'route_id': '4003286',
+    'type': 'vehicle-based',
+    'vehicle_id': '4016897'},
+    {'arrival_at': '2019-03-23T01:52:20-04:00',
+    'route_id': '4003286',
+    'type': 'vehicle-based',
+    'vehicle_id': '4014853'}]
+else:
+    agency = get_agency(geo_area=geo_area)
+    agency_id = agency['agency_id']
+    route = get_route(agency_id, bus_line)
+    nearest_stop = get_nearest_stop(agency_id, geo_area)
+    estimates = get_arrival_estimates(agency_id, routes=[route['route_id']], stops=[nearest_stop['stop_id']])
+    arrival_times = get_arrival_time_estimates(estimates)
+
 print("Agency id:", agency_id)
-
-route = get_route(agency_id, bus_line)
-# route = {'agency_id': 347,
-#  'color': 'ef83f2',
-#  'description': '',
-#  'is_active': True,
-#  'is_hidden': False,
-#  'long_name': 'Northline',
-#  'route_id': '4003286',
-#  'segments': [['540416931', 'forward'],
-#               ['549906078', 'backward'],
-#               ['581170961', 'backward'],
-#               ['603002991', 'forward'],
-#               ['606885185', 'forward'],
-#               ['620186348', 'forward'],
-#               ['623754453', 'forward'],
-#               ['624430590', 'forward'],
-#               ['626981847', 'backward'],
-#               ['628961367', 'backward'],
-#               ['644727345', 'forward'],
-#               ['647516646', 'forward'],
-#               ['650597156', 'forward'],
-#               ['679296756', 'forward'],
-#               ['685478620', 'forward'],
-#               ['720756167', 'backward'],
-#               ['732168762', 'forward'],
-#               ['734413457', 'forward'],
-#               ['767465664', 'forward'],
-#               ['787155905', 'backward'],
-#               ['789247268', 'forward']],
-#  'short_name': '',
-#  'stops': ['4123890',
-#            '4123882',
-#            '4123886',
-#            '4123994',
-#            '4178522',
-#            '4229092',
-#            '4178524',
-#            '4209050',
-#            '4209054',
-#            '4209058',
-#            '4148110',
-#            '4137602',
-#            '4209066',
-#            '4123970',
-#            '4123962',
-#            '4221190',
-#            '4123774',
-#            '4123770',
-#            '4123978',
-#            '4123966',
-#            '4124058',
-#            '4123982',
-#            '4123826',
-#            '4123842',
-#            '4209056',
-#            '4209060',
-#            '4209052',
-#            '4123990',
-#            '4123758',
-#            '4123754',
-#            '4124042'],
-#  'text_color': 'FFFFFF',
-#  'type': 'bus',
-#  'url': ''}
 print("Route:", route['long_name'])
-
-nearest_stop = get_nearest_stop(agency_id, geo_area)
-# nearest_stop = {'code': '040', 'description': '', 'url': '', 'parent_station_id': None, 'agency_ids': ['347'], 'station_id': None, 'location_type': 'stop', 'location': {'lat': 38.029349, 'lng': -78.519545}, 'stop_id': '4123890', 'routes': ['4003286', '4011564'], 'name': 'Hereford Dr @ Runk Dining Hall'}
 print("Nearest stop:", nearest_stop['name'])
-
-estimates = get_arrival_estimates(agency_id, routes=[route['route_id']], stops=[nearest_stop['stop_id']])
-# estimates = [{'arrival_at': '2019-03-23T01:08:16-04:00',
-#                 'route_id': '4003286',
-#                 'type': 'vehicle-based',
-#                 'vehicle_id': '4014853'},
-#                {'arrival_at': '2019-03-23T01:33:48-04:00',
-#                 'route_id': '4003286',
-#                 'type': 'vehicle-based',
-#                 'vehicle_id': '4016897'},
-#                {'arrival_at': '2019-03-23T01:52:20-04:00',
-#                 'route_id': '4003286',
-#                 'type': 'vehicle-based',
-#                 'vehicle_id': '4014853'}]
-arrival_times = get_arrival_time_estimates(estimates)
-print("Arrival estimates:")
-pprint([int(time.total_seconds()/60) for time in arrival_times])
+print("Arrival estimates:", [int(time.total_seconds()/60) for time in arrival_times])
