@@ -1,0 +1,21 @@
+{
+  "manifest": {
+    "apis": {
+      "custom": {
+        "endpoint": {
+          "uri": "busbuddy",
+          "sourceDir": "lambda/us-east-1_busbuddy"
+        },
+        "interfaces": []
+      }
+    },
+    "manifestVersion": "1.0",
+    "publishingInformation": {
+      "locales": {
+        "en-US": {
+          "name": "BusBuddy"
+        }
+      }
+    }
+  }
+}

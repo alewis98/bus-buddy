@@ -1,0 +1,87 @@
+{
+  "interactionModel": {
+    "languageModel": {
+      "invocationName": "bus buddy",
+      "intents": [
+        {
+          "name": "AMAZON.FallbackIntent",
+          "samples": []
+        },
+        {
+          "name": "AMAZON.CancelIntent",
+          "samples": []
+        },
+        {
+          "name": "AMAZON.HelpIntent",
+          "samples": []
+        },
+        {
+          "name": "AMAZON.StopIntent",
+          "samples": []
+        },
+        {
+          "name": "AMAZON.NavigateHomeIntent",
+          "samples": []
+        },
+        {
+          "name": "GetNextBus",
+          "slots": [
+            {
+              "name": "bus_line",
+              "type": "BusLine"
+            }
+          ],
+          "samples": [
+            "When is the next {bus_line}",
+            "When is the next bus coming",
+            "When does the next bus get here",
+            "What time is the next bus",
+            "When does the next bus arrive",
+            "When is the next bus"
+          ]
+        }
+      ],
+      "types": [
+        {
+          "values": [
+            {
+              "name": {
+                "value": "Redline",
+                "synonyms": [
+                  "red line"
+                ]
+              }
+            },
+            {
+              "name": {
+                "value": "Inner Loop",
+                "synonyms": [
+                  "innerloop"
+                ]
+              }
+            },
+            {
+              "name": {
+                "value": "Outer Loop",
+                "synonyms": [
+                  "outerloop"
+                ]
+              }
+            },
+            {
+              "name": {
+                "value": "Northline",
+                "synonyms": [
+                  "northline",
+                  "north line"
+                ]
+              }
+            }
+          ],
+          "name": "BusLine"
+        }
+      ]
+    }
+  },
+  "version": "11"
+}

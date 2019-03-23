@@ -1,0 +1,33 @@
+{
+  "deploy_settings": {
+    "default": {
+      "skill_id": "amzn1.ask.skill.c4707413-bbbf-4630-bb5f-f64486c4b4ed",
+      "was_cloned": true,
+      "merge": {},
+      "resources": {
+        "manifest": {
+          "eTag": "4fb50bdd7dcfa4f9aedde8658f05ec40"
+        },
+        "interactionModel": {
+          "en-US": {
+            "eTag": "f1b536e74c8a49202c76a0a94cfc6117"
+          }
+        },
+        "lambda": [
+          {
+            "arn": "arn:aws:lambda:us-east-1:775840356445:function:busbuddy",
+            "awsRegion": "us-east-1",
+            "functionName": "busbuddy",
+            "alexaUsage": [
+              "custom/default"
+            ],
+            "revisionId": "a51e098e-5bb1-489f-b074-0cc4890b7208",
+            "codeUri": "lambda/us-east-1_busbuddy",
+            "handler": "lambda_function.lambda_handler",
+            "runtime": "python3.7"
+          }
+        ]
+      }
+    }
+  }
+}
