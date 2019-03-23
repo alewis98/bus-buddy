@@ -28,8 +28,6 @@ def build_geo_area(latitude, longitude, radius):
 latitude = 38.0294814
 longitude = -78.5193463
 radius = 1000
-# bus_line = "Northline"
-# geo_area = build_geo_area(latitude, longitude, radius)
 
 use_cached_requests = True
 
@@ -129,13 +127,15 @@ def format_time(arrival):
 
 
 def get_arrival_text(arrival_times):
-    text = "The next bus " + format_time(arrival_times[0])
+    text = "The next bus " + format_time(arrival_times[0]) + ". "
     for i in range(1, len(arrival_times)):
         text += "\nAnother bus " + format_time(arrival_times[i])
     return text
 
 
 def run_test():
+    bus_line = "Northline"
+    geo_area = build_geo_area(latitude, longitude, radius)
     if use_cached_requests:
         agency_id = '347'
         route = {'agency_id': 347,
@@ -228,7 +228,7 @@ def run_test():
     print("Arrival estimates:", [int(time.total_seconds()/60) for time in arrival_times])
 
 
-def build_response(text):
+def build_response_alexa(text):
     response = {
         'version': '1.0',
         'response': {
@@ -241,32 +241,48 @@ def build_response(text):
     return response
 
 
-def on_launch(intent_request, session):
-    return build_response("Welcome to Bus Buddy")
+def build_permission_card_response_alexa(permissions):
+    response = {
+        'version': '1.0',
+        'response': {
+            'card':{
+                'type': 'AskForPermissionsConsent',
+                'permissions': permissions
+            }
+        }
+    }
+    return response
 
 
-def on_intent(intent_request, session):
+def on_launch_alexa(intent_request, session):
+    return build_response_alexa("Welcome to Bus Buddy")
+
+
+def on_intent_alexa(intent_request, session):
     intent = intent_request["intent"]
-    if intent["name"] == "GetNextBus":
-        values = intent["slots"]["bus_line"]["resolutions"]["resolutionsPerAuthority"]["values"]
+    intent_name = intent_request["intent"]["name"]
+    if intent_name == "GetNextBus":
+        values = intent["slots"]["bus_line"]["resolutions"]["resolutionsPerAuthority"][0]["values"]
         geo_area = build_geo_area(latitude, longitude, radius)
         agency_id = get_agency(geo_area)['agency_id']
         matched_route = None
         for value in values:
-            route = get_route(agency_id=agency_id, route_name=value['name'])
-            if route and route['agency_id'] == agency_id:
+            route = get_route(agency_id=agency_id, route_name=value['value']['name'])
+            if route and route['agency_id'] == int(agency_id):
                 matched_route = route
                 break
         if matched_route:
             nearest_stop = get_nearest_stop(agency_id, geo_area)
-            estimates = get_arrival_estimates(agency_id, routes=matched_route['route_id'], stops=[nearest_stop['stop_id']])
+            print("Nearest stop:", nearest_stop)
+            estimates = get_arrival_estimates(agency_id, routes=[matched_route['route_id']], stops=[nearest_stop['stop_id']])
+            print("Esimates:", estimates)
             arrival_times = get_arrival_time_estimates(estimates)
             text = get_arrival_text(arrival_times)
         else:
             text = "No bus found"
     else:
         raise ValueError("Invalid intent")
-    return build_response(text)
+    return build_response_alexa(text)
 
 
 def build_response_google(text):
@@ -304,13 +320,51 @@ def on_intent_google(intent_request):
         raise ValueError("Invalid intent")
     return build_response_google(text)
 
-def lambda_handler(event):
-    if event["request"]["type"] == "IntentRequest":
-        return on_intent(event["request"], event["session"])
-    elif event["request"]["type"] == "LaunchRequest":
-        return on_launch(event["request"], event["session"])
+
+def get_postal_addr_alexa(event):
+    system = event["context"]["System"]
+    user = system["user"]
+    api_token = system["apiAccessToken"]
+    host = system["apiEndpoint"]
+    device_id = system["device"]["deviceId"]
+    endpoint = "/v1/devices/" + str(device_id) + "/settings/address"
+    headers = {
+        "Authorization": "Bearer " + api_token
+    }
+    response = requests.get(host + endpoint, headers=headers)
+    return response.json()
+    
+
+
+def lambda_handler(event, context):  
+    pprint(event)
+    supported_interfaces = event["context"]["System"]["device"]["supportedInterfaces"]
+    user = event["context"]["System"]["user"]
+    gps_permission_status = user["permissions"]["scopes"]["alexa::devices:all:geolocation:read"]["status"]
+    if supported_interfaces.get("Geolocation") != None:
+        if gps_permission_status == "DENIED":
+            return build_permission_card_response_alexa(["alexa::devices:all:geolocation:read"])
+        else:
+            if event["context"].get("Geolocation"):
+                geo = event["context"]["Geolocation"]
+                latitude = geo["coordinate"]["latitudeInDegrees"]
+                longitude = geo["coordinate"]["longitudeInDegrees"]
+                return build_response_alexa("Your latitude is :" + str(latitude))
+            else:
+                return build_response_alexa("GPS info not available. Please enable location services and try again.")
     else:
-        return build_response("I think an error occurred")
+        response = get_postal_addr_alexa(event)
+        pprint(response)
+        if response.get("code") and response["code"] == "ACCESS_DENIED":
+            return build_permission_card_response_alexa(["read::alexa:device:all:address"])
+        else:
+            return build_response_alexa(response["addressLine1"])
+    if event["request"]["type"] == "IntentRequest":
+        return on_intent_alexa(event["request"], event["session"])
+    elif event["request"]["type"] == "LaunchRequest":
+        return on_launch_alexa(event["request"], event["session"])
+    else:
+        return build_response_alexa("I think an error occurred")
 
 
 def results(request):
