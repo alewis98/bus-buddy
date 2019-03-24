@@ -19,7 +19,7 @@ headers = {
 }
 
 
-def build_geo_area(latitude, longitude, radius=1000):
+def build_geo_area(latitude, longitude, radius=10000):
     # latitude, longitude|radius (meters)
     return str(latitude) + "," + str(longitude) + "|" + str(radius)
 
@@ -27,7 +27,6 @@ def build_geo_area(latitude, longitude, radius=1000):
 # coordinates for Whyburn: 38.0294814,-78.5193463|1000
 latitude = 38.0294814
 longitude = -78.5193463
-#radius = 1000
 
 
 def find_by_key(key_id, field, entities):
@@ -212,7 +211,7 @@ def when_is_bus_coming(intent_request, agency_id="", matched_route=None, geo_are
         params = intent_request["queryResult"]["parameters"]
         bus_line = params['bus_line']
         print("Bus line:", bus_line)
-        geo_area = build_geo_area(latitude, longitude, radius)
+        geo_area = build_geo_area(latitude, longitude)
         try:
             agency = get_agency(geo_area=geo_area)
             print("AGENCY:", agency)
@@ -242,7 +241,7 @@ def where_is_next_bus(intent_request, agency_id="", matched_route=None, geo_area
         params = intent_request["queryResult"]["parameters"]
         bus_line = params['bus_line']
         print("Bus line:", bus_line)
-        geo_area = build_geo_area(latitude, longitude, 10000)
+        geo_area = build_geo_area(latitude, longitude)
         try:
             agency = get_agency(geo_area=geo_area)
             print("AGENCY:", agency)
@@ -414,3 +413,37 @@ def results(request):
 def handler(request):
     # return response
     return json.dumps(results(request))
+
+
+
+print(handler({
+  "responseId": "9d2ade87-8ae9-46e7-94df-55d7f7134670",
+  "queryResult": {
+    "queryText": "when is the next northline",
+    "parameters": {
+      "bus_line": "Northline",
+      "request_type": "when"
+    },
+    "allRequiredParamsPresent": True,
+    "fulfillmentText": "The Northline is on its way",
+    "fulfillmentMessages": [
+      {
+        "text": {
+          "text": [
+            "The Northline is on its way"
+          ]
+        }
+      }
+    ],
+    "intent": {
+      "name": "projects/busbuddy-64e11/agent/intents/d6f859df-fae2-4c6c-aba6-e2ffdc637fc2",
+      "displayName": "GetNextBus"
+    },
+    "intentDetectionConfidence": 1,
+    "languageCode": "en"
+  },
+  "originalDetectIntentRequest": {
+    "payload": {}
+  },
+  "session": "projects/busbuddy-64e11/agent/sessions/53f2ad62-d27f-3a50-f7b1-4b8c9b358028"
+}))
