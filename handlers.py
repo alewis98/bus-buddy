@@ -74,9 +74,6 @@ def get_route(agency_id, route_name, geo_area=None):
     response = requests.get(api_url + ROUTES, headers=headers, params=payload)
     routes = response.json()['data'][agency_id]
 
-    for route in routes:
-        print(route['long_name'])
-
     return find_by_key(route_name, 'long_name', routes)
 
 
@@ -219,12 +216,17 @@ def get_one_bus_arrival_text(arrival_time, bus_line, stop_name):
 
 
 def convert_address_to_coordinates(address):
+    print("ADDRESS:", address)
     api_key = "AIzaSyDWCnuBAOcZHyNDzRTa6JC9PtDRnML6UQI"
-    address_string = " ".join([address['addressLine1'], \
-                               address['city'], address['stateOrRegion'], \
-                               address['postalCode'], address['countryCode']])
+    # address_string = "+".join([address['addressLine1'], \
+    #                            address['city'], address['stateOrRegion'], \
+    #                            address['postalCode'], address['countryCode']])
+    address_string = "+".join(address.values())
     response = requests.get('https://maps.googleapis.com/maps/api/geocode/json?address=' + address_string + "&key=" + api_key)
-    return response.json()['results'][0]['geometry']['location']
+    if len(response.json()['results']) == 0:
+        return None
+    else:
+        return response.json()['results'][0]['geometry']['location']
 
 
 def get_bus_line_info(intent_request, bus_lines, geo_area, where=False):
@@ -248,8 +250,8 @@ def get_bus_line_info(intent_request, bus_lines, geo_area, where=False):
     if not matched_route:
         return "I couldn't find any buses running that route right now"
 
-    print("Agency:", agency)
-    print("Matched route:", matched_route.get('route_id'))
+    print("AGENCY:", agency)
+    print("MATCHED ROUTE:", matched_route.get('route_id'))
     stops = sort_stops(agency_id, geo_area=geo_area)
 
     nearest_stop = None
@@ -262,7 +264,7 @@ def get_bus_line_info(intent_request, bus_lines, geo_area, where=False):
 
     print("Nearest stop:", nearest_stop['stop_id'])
     estimates = get_arrivals_for_stop(agency_id, stop_id=nearest_stop['stop_id'], routes=[matched_route['route_id']])
-    print("Esimates:", estimates)
+    print("ESTIMATES:", estimates)
     if not estimates or len(estimates) == 0:
         return "There are no upcoming " + matched_route['long_name'] + " buses near you."
 
@@ -271,8 +273,7 @@ def get_bus_line_info(intent_request, bus_lines, geo_area, where=False):
 
     if where:
         your_bus_id = estimates[0]['vehicle_id']
-        print("YOUR BUS:", your_bus_id)
-        print("MATCHED ROUTE:", matched_route)
+        print("YOUR BUS ID:", your_bus_id)
         current_stop = get_where_is_next_bus(agency_id, matched_route['route_id'], your_bus_id, stops=stops)
         if not current_stop:
             return "Can't find that bus right now"
@@ -314,7 +315,7 @@ def on_launch_alexa(intent_request, session):
     return build_response_alexa("Welcome to Bus Buddy")
 
 
-def on_intent_alexa(intent_request, session, addr=None):
+def on_intent_alexa(intent_request, session, addr):
     intent = intent_request["intent"]
     intent_name = intent_request["intent"]["name"]
     bus_lines = intent["slots"]["bus_line"]["resolutions"]["resolutionsPerAuthority"][0].get("values")
@@ -344,7 +345,22 @@ def on_intent_google(intent_request):
 
     # coordinates for Whyburn:          latitude=38.0294814, longitude=-78.5193463
     # coordinates for William and Mary: latitude=37.271674, longitude = -76.7155667
-    geo_area = build_geo_area(latitude=38.0294814, longitude=-78.5193463)
+    latitude=38.0294814
+    longitude=-78.5193463
+    if "location" in params.keys():
+        location = params['location']
+        print("ADDRESS DETECTED:", location)
+
+        if type(location) == type(""):
+            location = location if location != "" else "University of Virginia"
+            location = { "business": location }
+
+        location = convert_address_to_coordinates(location)
+        print("ADDRESS RESOLVED TO:", location)
+        if location:
+        	latitude  = location['lat']
+        	longitude = location['lng']
+    geo_area = build_geo_area(latitude=latitude, longitude=longitude)
 
     if intent['displayName'] == "GetNextBus":
         if request_type == "when":
@@ -406,6 +422,6 @@ def lambda_handler(event, context):
         return build_response_alexa("I think an error occurred")
 
 
-def handler(request):
+def google_handler(request):
     # return response
     return json.dumps(on_intent_google(request.get_json()))

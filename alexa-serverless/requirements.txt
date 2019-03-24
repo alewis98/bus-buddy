@@ -1,3 +1,4 @@
 requests==2.21.0
 pprint==0.1
 wordninja==0.1.5
+python-dateutil==2.7.3
