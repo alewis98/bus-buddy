@@ -71,10 +71,10 @@ def get_agencies(geo_area=None, agencies=None):
 
 def get_routes(agency_id, geo_area=None):
     payload = [ ('format',   'json'), \
-                ('agencies', agency_id),
-                \
+                ('agencies', agency_id), \
                 ('geo_area', geo_area) if geo_area else None \
                 ]
+
     payload = [x for x in payload if x is not None]
 
     response = requests.get(api_url + ROUTES, headers=headers, params=payload)
@@ -82,7 +82,7 @@ def get_routes(agency_id, geo_area=None):
 
 
 def get_route(agency_id, route_name, geo_area=None):
-    routes = get_routes(agency_id, geo_area=geo_area) 
+    routes = get_routes(agency_id, geo_area=geo_area)
     return find_by_key(route_name, 'long_name', routes)
 
 
@@ -216,10 +216,12 @@ def get_one_bus_arrival_text(arrival_time, bus_line, stop_name):
 def convert_address_to_coordinates(address):
     print("ADDRESS:", address)
     api_key = "AIzaSyDWCnuBAOcZHyNDzRTa6JC9PtDRnML6UQI"
-    # address_string = "+".join([address['addressLine1'], \
-    #                            address['city'], address['stateOrRegion'], \
-    #                            address['postalCode'], address['countryCode']])
-    address_string = "+".join(address.values())
+    try:
+        address_string = "+".join([address['addressLine1'], \
+                                   address['city'], address['stateOrRegion'], \
+                                   address['postalCode'], address['countryCode']])
+    except:
+        address_string = "+".join(address.values())
     response = requests.get('https://maps.googleapis.com/maps/api/geocode/json?address=' + address_string + "&key=" + api_key)
     if len(response.json()['results']) == 0:
         return None
@@ -429,4 +431,3 @@ def lambda_handler(event, context):
 def google_handler(request):
     # return response
     return json.dumps(on_intent_google(request.get_json()))
-
