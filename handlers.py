@@ -318,7 +318,7 @@ def on_intent_alexa(intent_request, session, addr=None):
     intent_name = intent_request["intent"]["name"]
     bus_lines = intent["slots"]["bus_line"]["resolutions"]["resolutionsPerAuthority"][0].get("values")
     if not bus_lines:
-        print("AHHHHHHHHHHHHHHHHHHHHHHH")
+        print("No bus lines, ok to panic.")
     geo_area = build_geo_area(addr["lat"], addr["lng"])
     agency_id = get_agency(geo_area)['agency_id']
     matched_route = None
@@ -410,6 +410,7 @@ def lambda_handler(event, context):
 
 def handler(request):
     # return response
+<<<<<<< HEAD
     return json.dumps(on_intent_google(request.get_json()))
 
 print(on_intent_google({
@@ -443,3 +444,6 @@ print(on_intent_google({
   },
   "session": "projects/busbuddy-64e11/agent/sessions/53f2ad62-d27f-3a50-f7b1-4b8c9b358028"
 }))
+=======
+    return json.dumps(on_intent_google(request.get_json()))
+>>>>>>> c9cc9473712db1bfd55a6cc59b732f04023ed686
