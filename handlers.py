@@ -4,7 +4,6 @@ import requests
 from pprint import pprint
 from datetime import datetime
 import dateutil.parser
-from beautifultable import BeautifulTable
 
 # request types
 AGENCIES = "agencies"
