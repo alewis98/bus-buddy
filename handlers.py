@@ -4,6 +4,7 @@ import requests
 from pprint import pprint
 from datetime import datetime
 import dateutil.parser
+from beautifultable import BeautifulTable
 
 # request types
 AGENCIES = "agencies"
@@ -68,7 +69,7 @@ def get_agencies(geo_area=None, agencies=None):
     return response.json()['data']
 
 
-def get_route(agency_id, route_name, geo_area=None):
+def get_routes(agency_id, geo_area=None):
     payload = [ ('format',   'json'), \
                 ('agencies', agency_id),
                 \
@@ -77,8 +78,11 @@ def get_route(agency_id, route_name, geo_area=None):
     payload = [x for x in payload if x is not None]
 
     response = requests.get(api_url + ROUTES, headers=headers, params=payload)
-    routes = response.json()['data'][agency_id]
+    return response.json()['data'].get(agency_id)
 
+
+def get_route(agency_id, route_name, geo_area=None):
+    routes = get_routes(agency_id, geo_area=geo_area) 
     return find_by_key(route_name, 'long_name', routes)
 
 
@@ -425,3 +429,4 @@ def lambda_handler(event, context):
 def google_handler(request):
     # return response
     return json.dumps(on_intent_google(request.get_json()))
+
