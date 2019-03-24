@@ -357,8 +357,12 @@ def on_intent_google(intent_request):
         print("ADDRESS DETECTED:", location)
 
         if type(location) == type(""):
-            location = location if location != "" else "University of Virginia"
-            location = { "business": location }
+            location = {'addressLine1': "216 Johnson", \
+                        'city': "Charlottesvile", \
+                        'stateOrRegion': "Virginia", \
+                        'postalCode': "22904-2120", \
+                        'countryCode': "US"
+                        }
 
         location = convert_address_to_coordinates(location)
         print("ADDRESS RESOLVED TO:", location)
