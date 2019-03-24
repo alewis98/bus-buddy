@@ -1,5 +1,6 @@
 import requests
 import json
+import wordninja
 from pprint import pprint
 import regex as re
 
@@ -37,17 +38,18 @@ for agency_id, routes in response.json()['data'].items():
         long_name = parens.sub("", route["long_name"])
         long_name = slashes.sub(" ", long_name).strip()
 
-        synonyms = [ short_name ] if short_name != "" else []
+        synonyms = [ short_name.lower() ] if short_name != "" else []
+        synonyms.append(long_name.lower())
+        compound = " ".join(wordninja.split(long_name.lower()))  # northline -> north line
+        if compound not in synonyms:
+            synonyms.append(compound)
 
         alexa_name = {
             "name": {
                 "value": long_name,
+                "synonyms": synonyms
             }
         }
-
-        # Alexa won't take an empty synonyms list
-        if short_name != "" :
-            alexa_name["name"]["synonyms"] = synonyms
 
         # Google needs the "name" to be included as a synonym
         synonyms.append(long_name)
