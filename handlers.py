@@ -43,6 +43,8 @@ def find_by_key(key_id, field, entities):
             return entity
 
     print("couldn't find", key_id)
+    print("key_id:", key_id, "field:", field, "entities:", entities)
+
 
 
 def get_agencies(geo_area=None, agencies=None):
@@ -318,10 +320,12 @@ def on_intent_alexa(intent_request, session, addr=None):
     bus_lines = intent["slots"]["bus_line"]["resolutions"]["resolutionsPerAuthority"][0].get("values")
     geo_area = build_geo_area(addr["lat"], addr["lng"])
 
+    bus_names = [bus['value']['name'] for bus in bus_lines]
+
     if intent_name == "GetNextBus":
-        text = get_bus_line_info(intent_request, bus_lines, geo_area=geo_area, where=False)
+        text = get_bus_line_info(intent_request, bus_names, geo_area=geo_area, where=False)
     elif intent_name == "WhereIsBus":
-        text = get_bus_line_info(intent_request, bus_lines, geo_area=geo_area, where=True)
+        text = get_bus_line_info(intent_request, bus_names, geo_area=geo_area, where=True)
     else:
         return build_response_alexa("Invalid Intent")
     return build_response_alexa(text)
