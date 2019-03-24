@@ -1,6 +1,7 @@
 import requests
 import json
 from pprint import pprint
+import regex as re
 
 # request types
 AGENCIES = "agencies"
@@ -25,23 +26,36 @@ response = requests.get(api_url + ROUTES, headers=headers, params=payload)
 alexa_all_routes = []
 google_all_routes = []
 
+parens = re.compile(r"\(.*\)")
+slashes = re.compile(r"\/")
 for agency_id, routes in response.json()['data'].items():
     for route in routes:
+
+        # TODO other string manipulating synonym-finding logic here
+        short_name = parens.sub("", route["short_name"])
+        short_name = slashes.sub(" ", short_name).strip()
+        long_name = parens.sub("", route["long_name"])
+        long_name = slashes.sub(" ", long_name).strip()
+
+        synonyms = [ short_name ] if short_name != "" else []
+
         alexa_name = {
             "name": {
-                "value": route["long_name"],
+                "value": long_name,
             }
         }
 
-        if route["short_name"] != "" :
-            alexa_name["name"]["synonyms"] = [ route["short_name"] ]
+        # Alexa won't take an empty synonyms list
+        if short_name != "" :
+            alexa_name["name"]["synonyms"] = synonyms
+
+        # Google needs the "name" to be included as a synonym
+        synonyms.append(long_name)
 
         google_name = {
-            "value": route["long_name"],
+            "value": long_name,
+            "synonyms": synonyms
         }
-
-        if route["short_name"] != "" :
-            google_name["synonyms"] = [ route["short_name"] ]
 
         alexa_all_routes.append(alexa_name)
         google_all_routes.append(google_name)

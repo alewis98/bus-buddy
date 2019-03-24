@@ -1,7 +1,7 @@
-import requests
+import math
 import json
+import requests
 from pprint import pprint
-from math import hypot
 from datetime import datetime
 import dateutil.parser
 
@@ -19,7 +19,7 @@ headers = {
 }
 
 
-def build_geo_area(latitude, longitude, radius):
+def build_geo_area(latitude, longitude, radius=1000):
     # latitude, longitude|radius (meters)
     return str(latitude) + "," + str(longitude) + "|" + str(radius)
 
@@ -34,11 +34,19 @@ radius = 1000
 use_cached_requests = True
 
 
+def find_by_key(key_id, field, entities):
+    # pprint(entities)
+    for entity in entities:
+        if entity[field] == key_id:
+            return entity
+    print("couldn't find", key_id)
+
 
 def get_agency(geo_area=None, agencies=None):
-    payload = [ ('format',   'json'),
-                ('agencies', agencies) if agencies else None,
-                ('geo_area', geo_area) if geo_area else None ]
+    payload = [ ('format',   'json'), \
+                ('agencies', agencies) if agencies else None, \
+                ('geo_area', geo_area) if geo_area else None \
+                ]
     payload = [x for x in payload if x is not None]
 
     response = requests.get(api_url + AGENCIES, headers=headers, params=payload)
@@ -47,65 +55,107 @@ def get_agency(geo_area=None, agencies=None):
         print("NO AGENCY FOUND")
         exit()
 
-    agency_id = response.json()['data'][0]
-    return agency_id
+    agency = response.json()['data'][0]  # assume this is the right one
+    return agency
 
 
 def get_route(agency_id, route_name, geo_area=None):
-    payload = [ ('format',   'json'),
+    payload = [ ('format',   'json'), \
                 ('agencies', agency_id),
-                ('geo_area', geo_area) if geo_area else None
+                \
+                ('geo_area', geo_area) if geo_area else None \
                 ]
     payload = [x for x in payload if x is not None]
 
-
     response = requests.get(api_url + ROUTES, headers=headers, params=payload)
-
     routes = response.json()['data'][agency_id]
 
-    route_name = route_name.lower()
-    for route in routes:
-        if route['long_name'].lower() == route_name:
-            return route
-
-    print("couldn't find route")
+    return find_by_key(route_name, 'long_name', routes)
 
 
-def get_nearest_stop(agency_id, geo_area):
-    payload = [ ('format',   'json'),
-                ('agencies', agency_id),
-                ('geo_area', geo_area) if geo_area else None
+def distance_between(lat_1, lon_1, lat_2, lon_2):
+    '''Uses the "great circle distance" formula and the circumference of the earth
+    to convert two GPS coordinates to the miles separating them'''
+    lat_1, lon_1 = math.radians(lat_1), math.radians(lon_1)
+    lat_2, lon_2 = math.radians(lat_2), math.radians(lon_2)
+    theta = lon_1 - lon_2
+    dist = math.sin(lat_1)*math.sin(lat_2) + math.cos(lat_1)*math.cos(lat_2)*math.cos(theta)
+    dist = math.acos(dist)
+    dist = math.degrees(dist)
+    dist = dist * 69.06         # 69.09 = circumference of earth in miles / 360 degrees
+
+    return dist
+
+
+def get_stops(agency_id, geo_area=None):
+    payload = [ ('format',   'json'), \
+                ('agencies', agency_id), \
+                ('geo_area', geo_area) if geo_area else None \
                 ]
     payload = [x for x in payload if x is not None]
 
     response = requests.get(api_url + STOPS, headers=headers, params=payload)
-    stops = response.json()['data']
+    return response.json()['data']
 
-    print("STOPS:", stops)
-    print("There are", len(stops), "stops")
 
-    closest_stop = sorted(stops, key=lambda x: hypot(x['location']['lat'] - latitude, x['location']['lng'] - longitude))[0]
+def sort_stops(agency_id, stops=None, geo_area=None):
+    if not stops:
+        stops = get_stops(agency_id, geo_area)
+
+    closest_stop = sorted(stops, key=lambda x: distance_between(x['location']['lat'], x['location']['lng'], latitude, longitude))
     return closest_stop
 
 
-def get_arrival_estimates(agency_id, routes=None, stops=None):
-    payload = [ ('format',   'json'),
-                ('agencies', agency_id),
-                ('routes', ",".join(routes)) if routes else None,
-                ('stops', ",".join(stops)) if stops else None
+def get_vehicles(agency_id, routes=None, geo_area=None):
+    payload = [ ('format',   'json'), \
+                ('agencies', agency_id), \
+                ('geo_area', geo_area) if geo_area else None, \
+                ('routes', ",".join(routes)) if routes else None \
                 ]
     payload = [x for x in payload if x is not None]
 
-    print("Arrival Payload", payload)
+    response = requests.get(api_url + VEHICLES, headers=headers, params=payload)
+    vehicles = response.json()['data'][agency_id]
+
+    print("There are", len(vehicles), "vehicles")
+    return vehicles
+
+
+def get_vehicle_current_stop(vehicle):
+    return vehicle['arrival_estimates'][0]
+
+
+def get_arrival_estimates(agency_id, routes=None, stops=None):
+    payload = [ ('format',   'json'), \
+                ('agencies', agency_id), \
+                ('routes', ",".join(routes)) if routes else None, \
+                ('stops', ",".join(stops)) if stops else None \
+                ]
+    payload = [x for x in payload if x is not None]
 
     response = requests.get(api_url + ARRIVAL_ESTIMATES, headers=headers, params=payload)
-    print("Arrival Response:", response)
-    return response.json()['data'][0]['arrivals']
+    return response.json()['data']
+
+
+def get_arrivals_for_stop(agency_id, stop_id, routes=None):
+    arrivals = get_arrival_estimates(agency_id, routes=routes, stops=[stop_id])
+    return find_by_key(stop_id, "stop_id", arrivals)['arrivals']
 
 
 def get_arrival_time_estimates(arrivals):
     now = datetime.now()
     return sorted([dateutil.parser.parse(arrival['arrival_at']).replace(tzinfo=None) - now for arrival in arrivals])
+
+
+def get_where_is_next_bus(agency_id, route_id, vehicle_id, stops=None, geo_area=None):
+    if not stops:
+        stops = sort_stops(agency_id, geo_area=geo_area)
+
+    vehicles = get_vehicles(agency_id, routes=[route_id])
+    your_bus = find_by_key(vehicle_id, "vehicle_id", vehicles)
+
+    current_stop = get_vehicle_current_stop(your_bus)
+    return find_by_key(current_stop['stop_id'], 'stop_id', stops)
 
 
 def format_time(arrival):
@@ -133,6 +183,15 @@ def get_arrival_text(arrival_times):
     for i in range(1, len(arrival_times)):
         text += "\nAnother bus " + format_time(arrival_times[i])
     return text
+
+
+def convert_address_to_coordinates(address):
+    api_key = "AIzaSyDWCnuBAOcZHyNDzRTa6JC9PtDRnML6UQI"
+    address_string = " ".join([address['addressLine1'], \
+                               address['city'], address['stateOrRegion'], \
+                               address['postalCode'], address['countryCode']])
+    response = requests.get('https://maps.googleapis.com/maps/api/geocode/json?address=' + address_string + "&key=" + api_key)
+    return response.json()['results'][0]['geometry']['location']
 
 
 def run_test():
@@ -218,8 +277,8 @@ def run_test():
         agency = get_agency(geo_area=geo_area)
         agency_id = agency['agency_id']
         route = get_route(agency_id, bus_line)
-        nearest_stop = get_nearest_stop(agency_id, geo_area)
-        estimates = get_arrival_estimates(agency_id, routes=[route['route_id']], stops=[nearest_stop['stop_id']])
+        nearest_stop = sort_stops(agency_id, geo_area=geo_area)[0]
+        estimates = get_arrivals_for_stop(agency_id, stop_id=nearest_stop['stop_id'], routes=[route['route_id']])
         arrival_times = get_arrival_time_estimates(estimates)
 
     print("Agency id:", agency_id)
@@ -258,8 +317,8 @@ def on_intent(intent_request, session):
                 matched_route = route
                 break
         if matched_route:
-            nearest_stop = get_nearest_stop(agency_id, geo_area)
-            estimates = get_arrival_estimates(agency_id, routes=matched_route['route_id'], stops=[nearest_stop['stop_id']])
+            nearest_stop = sort_stops(agency_id, geo_area=geo_area)[0]
+            estimates = get_arrivals_for_stop(agency_id, routes=matched_route['route_id'], stops=[nearest_stop['stop_id']])
             arrival_times = get_arrival_time_estimates(estimates)
             text = get_arrival_text(arrival_times)
         else:
@@ -273,36 +332,80 @@ def build_response_google(text):
     return {'fulfillmentText': text}
 
 
+def when_is_bus_coming(intent_request):
+    params = intent_request["queryResult"]["parameters"]
+    bus_line = params['bus_line']
+    print("Bus line:", bus_line)
+    geo_area = build_geo_area(latitude, longitude, radius)
+    try:
+        agency = get_agency(geo_area=geo_area)
+        print("AGENCY:", agency)
+        agency_id = agency['agency_id']
+    except:
+        agency_id = '347'
+    print("Agency ID:", agency_id)
+    route = get_route(agency_id=agency_id, route_name=bus_line)
+    matched_route = route if route and route['agency_id'] == int(agency_id) else None
+    print("Matched route:", matched_route.get('route_id'))
+    if matched_route:
+        nearest_stop = sort_stops(agency_id, geo_area=geo_area)[0]
+        print("Nearest stop:", nearest_stop.get('stop_id'))
+        estimates = get_arrivals_for_stop(agency_id, stop_id=nearest_stop['stop_id'], routes=[matched_route['route_id']])
+        print("Esimates:", estimates)
+        arrival_times = get_arrival_time_estimates(estimates)
+        text = get_arrival_text(arrival_times)
+    else:
+        text = "Couldn't find any buses running that route right now"
+
+    return text
+
+
+def where_is_next_bus(intent_request):
+    params = intent_request["queryResult"]["parameters"]
+    bus_line = params['bus_line']
+    print("Bus line:", bus_line)
+    geo_area = build_geo_area(latitude, longitude, radius)
+    try:
+        agency = get_agency(geo_area=geo_area)
+        print("AGENCY:", agency)
+        agency_id = agency['agency_id']
+    except:
+        agency_id = '347'
+    print("Agency ID:", agency_id)
+    route = get_route(agency_id=agency_id, route_name=bus_line)
+    matched_route = route if route and route['agency_id'] == int(agency_id) else None
+    print("Matched route:", matched_route.get('route_id'))
+    if matched_route:
+        stops = sort_stops(agency_id, geo_area=geo_area)
+        nearest_stop = stops[0]
+        estimates = get_arrivals_for_stop(agency_id, stop_id=nearest_stop['stop_id'], routes=[matched_route['route_id']])
+        your_bus = estimates[0]['vehicle_id']
+        print("YOUR BUS:", your_bus)
+        current_stop = get_where_is_next_bus(agency_id, route['route_id'], your_bus, stops=stops)
+        text = "The next bus is currently at " + current_stop.get('name')
+    else:
+        text = "Couldn't find any buses running that route right now"
+
+    return text
+
+
 def on_intent_google(intent_request):
     intent = intent_request["queryResult"]["intent"]
+
+    params = intent_request.get('queryResult').get('parameters')
+    request_type = params['request_type'].lower()
+
     if intent['displayName'] == "GetNextBus":
-        params = intent_request["queryResult"]["parameters"]
-        bus_line = params['bus_line']
-        print("Bus line:", bus_line)
-        geo_area = build_geo_area(latitude, longitude, radius)
-        try:
-            agency = get_agency(geo_area=geo_area)
-            print("AGENCY:", agency)
-            agency_id = agency['agency_id']
-        except:
-            agency_id = '347'
-        print("Agency ID:", agency_id)
-        route = get_route(agency_id=agency_id, route_name=bus_line)
-        print("Route:", route)
-        matched_route = route if route and route['agency_id'] == int(agency_id) else None
-        print("Matched route:", matched_route)
-        if matched_route:
-            nearest_stop = get_nearest_stop(agency_id, geo_area)
-            print("Nearest stop:", nearest_stop)
-            estimates = get_arrival_estimates(agency_id, routes=[matched_route['route_id']], stops=[nearest_stop['stop_id']])
-            print("Esimates:", estimates)
-            arrival_times = get_arrival_time_estimates(estimates)
-            text = get_arrival_text(arrival_times)
+        if request_type == "when":
+            text = when_is_bus_coming(intent_request)
+        elif request_type == "where":
+            text = where_is_next_bus(intent_request)
         else:
-            text = "No bus found"
+            raise ValueError("Invalid request")
     else:
         raise ValueError("Invalid intent")
     return build_response_google(text)
+
 
 def lambda_handler(event):
     if event["request"]["type"] == "IntentRequest":
@@ -314,16 +417,45 @@ def lambda_handler(event):
 
 
 def results(request):
-    request_json = request.get_json()
+    # request_json = request.get_json() # TODO CHANGE THIS BACK
+    request_json = request
     params = request_json.get('queryResult').get('parameters')
-    if params['request_type'] == "where":
-        return {'fulfillmentText': 'WHERE YOU AT ' + params['bus_line']}
-    elif params['request_type'] == "when":
-        return on_intent_google(request_json)
-    else:
-        return build_response_google("We've lost the " + params['bus_line'])
+    request_type = params['request_type'].lower()
+    return on_intent_google(request_json)
 
 
 def handler(request):
     # return response
     return json.dumps(results(request))
+
+print(handler({
+  "responseId": "9d2ade87-8ae9-46e7-94df-55d7f7134670",
+  "queryResult": {
+    "queryText": "when is the next northline",
+    "parameters": {
+      "bus_line": "Northline",
+      "request_type": "where"
+    },
+    "allRequiredParamsPresent": True,
+    "fulfillmentText": "The Northline is on its way",
+    "fulfillmentMessages": [
+      {
+        "text": {
+          "text": [
+            "The Northline is on its way"
+          ]
+        }
+      }
+    ],
+    "intent": {
+      "name": "projects/busbuddy-64e11/agent/intents/d6f859df-fae2-4c6c-aba6-e2ffdc637fc2",
+      "displayName": "GetNextBus"
+    },
+    "intentDetectionConfidence": 1,
+    "languageCode": "en"
+  },
+  "originalDetectIntentRequest": {
+    "payload": {}
+  },
+  "session": "projects/busbuddy-64e11/agent/sessions/53f2ad62-d27f-3a50-f7b1-4b8c9b358028"
+}))
