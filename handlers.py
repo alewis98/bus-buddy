@@ -24,13 +24,12 @@ def build_geo_area(latitude, longitude, radius=10000):
     return str(latitude) + "," + str(longitude) + "|" + str(radius)
 
 
-# coordinates for Whyburn
-# latitude = 38.0294814
-# longitude = -78.5193463
-
-# coordinates for William and Mary
-latitude = 37.271674
-longitude = -76.7155667
+def uncouple_geo_area(geo):
+    return {
+        "latitude" : float(geo[:geo.find(",")]),
+        "longitude": float(geo[geo.find(",")+1:geo.find("|")]),
+        "radius"   : int(geo[geo.find("|")+1:])
+    }
 
 
 def find_by_key(key_id, field, entities):
@@ -45,7 +44,7 @@ def find_by_key(key_id, field, entities):
     print("couldn't find", key_id)
 
 
-def get_agency(geo_area=None, agencies=None):
+def get_agencies(geo_area=None, agencies=None):
     payload = [ ('format',   'json'), \
                 ('agencies', agencies) if agencies else None, \
                 ('geo_area', geo_area) if geo_area else None \
@@ -58,8 +57,7 @@ def get_agency(geo_area=None, agencies=None):
         print("NO AGENCY FOUND")
         return None
 
-    agency = response.json()['data'][0]  # assume this is the right one
-    return agency
+    return response.json()['data']
 
 
 def get_route(agency_id, route_name, geo_area=None):
@@ -111,11 +109,13 @@ def get_stops(agency_id, geo_area=None, route_id=None):
         return response.json()['data']
 
 
-def sort_stops(agency_id, stops=None, geo_area=None):
+def sort_stops(agency_id, geo_area, stops=None):
     if not stops:
         stops = get_stops(agency_id, geo_area)
 
-    closest_stop = sorted(stops, key=lambda x: distance_between(x['location']['lat'], x['location']['lng'], latitude, longitude))
+    geo_dict = uncouple_geo_area(geo_area)
+
+    closest_stop = sorted(stops, key=lambda x: distance_between(x['location']['lat'], x['location']['lng'], geo_dict['latitude'], geo_dict['longitude']))
     return closest_stop
 
 
@@ -206,7 +206,7 @@ def get_arrival_text(arrival_times, bus_line, stop_name):
         return "There are no buses arriving soon."
     text = "The next " + bus_line + format_time(arrival_times[0]) + " at " + stop_name + "."
     for i in range(1, len(arrival_times)):
-        text += " Another bus " + format_time(arrival_times[i]) + "."
+        text += " Another bus" + format_time(arrival_times[i]) + "."
     return text
 
 
@@ -224,61 +224,59 @@ def convert_address_to_coordinates(address):
     return response.json()['results'][0]['geometry']['location']
 
 
-def get_bus_line_info(intent_request, agency_id="", matched_route=None, geo_area=None, where=False):
-    if agency_id == "":  # this is Google
-        params = intent_request["queryResult"]["parameters"]
-        bus_line = params['bus_line']
-        print("Bus line:", bus_line)
-        geo_area = build_geo_area(latitude, longitude)
-        try:
-            agency = get_agency(geo_area=geo_area)
-            if not agency:
-                return "That route is very far from your location"
+def get_bus_line_info(intent_request, bus_lines, geo_area, where=False):
+    text = ""
 
-            print("AGENCY:", agency)
-            agency_id = agency['agency_id']
-        except:
-            agency_id = '347'
-        print("Agency ID:", agency_id)
-        route = get_route(agency_id=agency_id, route_name=bus_line)
-        matched_route = route if route and route['agency_id'] == int(agency_id) else None
-    else:  # this is Alexa
-        bus_line = matched_route['long_name']
-    if matched_route:
-        print("Matched route:", matched_route.get('route_id'))
-        stops = sort_stops(agency_id, geo_area=geo_area)
+    agencies = get_agencies(geo_area=geo_area)
+    if not agencies:
+        return "That route is very far from your location"
+    print("AGENCIES:", agencies)
+    matched_route = None
 
-        nearest_stop = None
-        for stop in stops:
-            if matched_route['route_id'] in stop['routes']:
-                nearest_stop = stop
+    for ag in agencies:
+        for bus_line in bus_lines:
+            route = get_route(agency_id=ag['agency_id'], route_name=bus_line)
+            if route:
+                matched_route = route
+                agency = ag
+                agency_id= ag['agency_id']
                 break
-        if not nearest_stop:
-            return "I couldn't find any stops near you for the " + bus_line
 
-        print("Nearest stop:", nearest_stop['stop_id'])
-        estimates = get_arrivals_for_stop(agency_id, stop_id=nearest_stop['stop_id'], routes=[matched_route['route_id']])
-        print("Esimates:", estimates)
-        if not estimates or len(estimates) == 0:
-            return "There are no upcoming " + matched_route['long_name'] + " buses near you."
+    if not matched_route:
+        return "Couldn't find any buses running that route right now"
 
-        arrival_time_deltas = get_arrival_time_estimates(estimates)
-        print("Arrival time deltas", arrival_time_deltas)
+    print("Agency:", agency)
+    print("Matched route:", matched_route.get('route_id'))
+    stops = sort_stops(agency_id, geo_area=geo_area)
 
-        if where:
-            your_bus_id = estimates[0]['vehicle_id']
-            print("YOUR BUS:", your_bus_id)
-            print("MATCHED ROUTE:", matched_route)
-            current_stop = get_where_is_next_bus(agency_id, matched_route['route_id'], your_bus_id, stops=stops)
-            if not current_stop:
-                return "Can't find that bus right now"
-            text = "The next bus is currently at " + str(current_stop.get('name')) + ". "
-            text += get_one_bus_arrival_text(arrival_time_deltas[0], bus_line, nearest_stop['name'])
-        else:
-            text = get_arrival_text(arrival_time_deltas, bus_line, nearest_stop['name'])
+    nearest_stop = None
+    for stop in stops:
+        if matched_route['route_id'] in stop['routes']:
+            nearest_stop = stop
+            break
+    if not nearest_stop:
+        return "I couldn't find any stops near you for the " + bus_line
 
+    print("Nearest stop:", nearest_stop['stop_id'])
+    estimates = get_arrivals_for_stop(agency_id, stop_id=nearest_stop['stop_id'], routes=[matched_route['route_id']])
+    print("Esimates:", estimates)
+    if not estimates or len(estimates) == 0:
+        return "There are no upcoming " + matched_route['long_name'] + " buses near you."
+
+    arrival_time_deltas = get_arrival_time_estimates(estimates)
+    print("Arrival time deltas", arrival_time_deltas)
+
+    if where:
+        your_bus_id = estimates[0]['vehicle_id']
+        print("YOUR BUS:", your_bus_id)
+        print("MATCHED ROUTE:", matched_route)
+        current_stop = get_where_is_next_bus(agency_id, matched_route['route_id'], your_bus_id, stops=stops)
+        if not current_stop:
+            return "Can't find that bus right now"
+        text = "The next bus is currently at " + str(current_stop.get('name')) + ". "
+        text += get_one_bus_arrival_text(arrival_time_deltas[0], bus_line, nearest_stop['name'])
     else:
-        text = "Couldn't find any buses running that route right now"
+        text = get_arrival_text(arrival_time_deltas, bus_line, nearest_stop['name'])
 
     return text
 
@@ -317,21 +315,12 @@ def on_intent_alexa(intent_request, session, addr=None):
     intent = intent_request["intent"]
     intent_name = intent_request["intent"]["name"]
     bus_lines = intent["slots"]["bus_line"]["resolutions"]["resolutionsPerAuthority"][0].get("values")
-    if not bus_lines:
-        print("No bus lines, ok to panic.")
     geo_area = build_geo_area(addr["lat"], addr["lng"])
-    agency_id = get_agency(geo_area)['agency_id']
-    matched_route = None
-    text = ""
-    for bus_line in bus_lines:
-        route = get_route(agency_id=agency_id, route_name=bus_line['value']['name'])
-        if route and route['agency_id'] == int(agency_id):
-            matched_route = route
-            break
+
     if intent_name == "GetNextBus":
-        text = get_bus_line_info(intent_request, agency_id=agency_id, matched_route=matched_route, geo_area=geo_area, where=False)
+        text = get_bus_line_info(intent_request, bus_lines, geo_area=geo_area, where=False)
     elif intent_name == "WhereIsBus":
-        text = get_bus_line_info(intent_request, agency_id=agency_id, matched_route=matched_route, geo_area=geo_area, where=True)
+        text = get_bus_line_info(intent_request, bus_lines, geo_area=geo_area, where=True)
     else:
         return build_response_alexa("Invalid Intent")
     return build_response_alexa(text)
@@ -348,11 +337,15 @@ def on_intent_google(intent_request):
     print("PARAMS:", params)
     request_type = params['request_type']
 
+    # coordinates for Whyburn:          latitude=38.0294814, longitude=-78.5193463
+    # coordinates for William and Mary: latitude=37.271674, longitude = -76.7155667
+    geo_area = build_geo_area(latitude=38.0294814, longitude=-78.5193463)
+
     if intent['displayName'] == "GetNextBus":
         if request_type == "when":
-            text = get_bus_line_info(intent_request, where=False)
+            text = get_bus_line_info(intent_request, [params['bus_line']], geo_area=geo_area, where=False)
         elif request_type == "where":
-            text = get_bus_line_info(intent_request, where=True)
+            text = get_bus_line_info(intent_request, [params['bus_line']], geo_area=geo_area, where=True)
         else:
             raise ValueError("Invalid request")
     else:
