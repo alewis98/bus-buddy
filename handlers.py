@@ -160,7 +160,6 @@ def get_arrival_estimates(agency_id, routes=None, stops=None):
     payload = [x for x in payload if x is not None]
 
     response = requests.get(api_url + ARRIVAL_ESTIMATES, headers=headers, params=payload)
-    print("RESPONSE", response.json())
     return response.json()['data']
 
 
@@ -275,14 +274,14 @@ def get_bus_line_info(intent_request, bus_lines, geo_area, where=False):
         print("YOUR BUS ID:", your_bus_id)
         vehicles = get_vehicles(agency_id, routes=[matched_route['route_id']])
 
-        your_bus = find_by_key(vehicle_id, "vehicle_id", vehicles)
+        your_bus = find_by_key(your_bus_id, "vehicle_id", vehicles)
         vehicle_current_stop = get_vehicle_current_stop(your_bus)
         current_stop = find_by_key(vehicle_current_stop['stop_id'], 'stop_id', stops)
 
         if not current_stop:
             return "Can't find that bus right now"
         text = "The next bus is currently at " + str(current_stop.get('name')) + ". "
-        text += get_bus_fullness()
+        text += get_bus_fullness(your_bus)
         text += get_one_bus_arrival_text(arrival_time_deltas[0], bus_line, nearest_stop['name'])
     else:
         text = get_arrival_text(arrival_time_deltas, bus_line, nearest_stop['name'])
@@ -434,3 +433,196 @@ def lambda_handler(event, context):
 def google_handler(request):
     # return response
     return json.dumps(on_intent_google(request.get_json()))
+
+
+print(on_intent_google({
+  "responseId": "0879233f-7794-455a-80e3-a4b31b626366",
+  "queryResult": {
+    "queryText": "when is the next Northline in Charlottesville Virginia",
+    "parameters": {
+      "bus_line": "Northline",
+      "request_type": "when",
+      "location": {
+        "city": "Charlottesville",
+        "admin-area": "Virginia"
+      }
+    },
+    "allRequiredParamsPresent": True,
+    "fulfillmentText": "The Northline is on in the way",
+    "fulfillmentMessages": [
+      {
+        "text": {
+          "text": [
+            "The Northline is on in the way"
+          ]
+        }
+      }
+    ],
+    "outputContexts": [
+      {
+        "name": "projects/busbuddy-64e11/agent/sessions/ABwppHGd-YQjAcuBGJ2565SUtEvlmN1hdGc6ncrwIix0QCgzS8baO1v6dur6ZxZn6hWrMG4pqSp4BUo3jhY/contexts/actions_capability_screen_output",
+        "parameters": {
+          "location.original": "Charlottesville Virginia",
+          "request_type": "when",
+          "bus_line": "Northline",
+          "location": {
+            "city": "Charlottesville",
+            "city.original": "Charlottesville",
+            "city.object": {},
+            "admin-area": "Virginia",
+            "admin-area.original": "Virginia",
+            "admin-area.object": {}
+          },
+          "bus_line.original": "Northline",
+          "request_type.original": "when"
+        }
+      },
+      {
+        "name": "projects/busbuddy-64e11/agent/sessions/ABwppHGd-YQjAcuBGJ2565SUtEvlmN1hdGc6ncrwIix0QCgzS8baO1v6dur6ZxZn6hWrMG4pqSp4BUo3jhY/contexts/actions_capability_audio_output",
+        "parameters": {
+          "location.original": "Charlottesville Virginia",
+          "request_type": "when",
+          "bus_line": "Northline",
+          "location": {
+            "city": "Charlottesville",
+            "city.original": "Charlottesville",
+            "city.object": {},
+            "admin-area": "Virginia",
+            "admin-area.original": "Virginia",
+            "admin-area.object": {}
+          },
+          "bus_line.original": "Northline",
+          "request_type.original": "when"
+        }
+      },
+      {
+        "name": "projects/busbuddy-64e11/agent/sessions/ABwppHGd-YQjAcuBGJ2565SUtEvlmN1hdGc6ncrwIix0QCgzS8baO1v6dur6ZxZn6hWrMG4pqSp4BUo3jhY/contexts/google_assistant_input_type_keyboard",
+        "parameters": {
+          "location.original": "Charlottesville Virginia",
+          "request_type": "when",
+          "bus_line": "Northline",
+          "location": {
+            "city": "Charlottesville",
+            "city.original": "Charlottesville",
+            "city.object": {},
+            "admin-area": "Virginia",
+            "admin-area.original": "Virginia",
+            "admin-area.object": {}
+          },
+          "bus_line.original": "Northline",
+          "request_type.original": "when"
+        }
+      },
+      {
+        "name": "projects/busbuddy-64e11/agent/sessions/ABwppHGd-YQjAcuBGJ2565SUtEvlmN1hdGc6ncrwIix0QCgzS8baO1v6dur6ZxZn6hWrMG4pqSp4BUo3jhY/contexts/actions_capability_web_browser",
+        "parameters": {
+          "location.original": "Charlottesville Virginia",
+          "request_type": "when",
+          "bus_line": "Northline",
+          "location": {
+            "city": "Charlottesville",
+            "city.original": "Charlottesville",
+            "city.object": {},
+            "admin-area": "Virginia",
+            "admin-area.original": "Virginia",
+            "admin-area.object": {}
+          },
+          "bus_line.original": "Northline",
+          "request_type.original": "when"
+        }
+      },
+      {
+        "name": "projects/busbuddy-64e11/agent/sessions/ABwppHGd-YQjAcuBGJ2565SUtEvlmN1hdGc6ncrwIix0QCgzS8baO1v6dur6ZxZn6hWrMG4pqSp4BUo3jhY/contexts/actions_capability_media_response_audio",
+        "parameters": {
+          "location.original": "Charlottesville Virginia",
+          "request_type": "when",
+          "bus_line": "Northline",
+          "location": {
+            "city": "Charlottesville",
+            "city.original": "Charlottesville",
+            "city.object": {},
+            "admin-area": "Virginia",
+            "admin-area.original": "Virginia",
+            "admin-area.object": {}
+          },
+          "bus_line.original": "Northline",
+          "request_type.original": "when"
+        }
+      }
+    ],
+    "intent": {
+      "name": "projects/busbuddy-64e11/agent/intents/d6f859df-fae2-4c6c-aba6-e2ffdc637fc2",
+      "displayName": "GetNextBus"
+    },
+    "intentDetectionConfidence": 1,
+    "languageCode": "en-us"
+  },
+  "originalDetectIntentRequest": {
+    "source": "google",
+    "version": "2",
+    "payload": {
+      "isInSandbox": True,
+      "surface": {
+        "capabilities": [
+          {
+            "name": "actions.capability.AUDIO_OUTPUT"
+          },
+          {
+            "name": "actions.capability.WEB_BROWSER"
+          },
+          {
+            "name": "actions.capability.SCREEN_OUTPUT"
+          },
+          {
+            "name": "actions.capability.MEDIA_RESPONSE_AUDIO"
+          }
+        ]
+      },
+      "requestType": "SIMULATOR",
+      "inputs": [
+        {
+          "rawInputs": [
+            {
+              "query": "when is the next Northline in Charlottesville Virginia",
+              "inputType": "KEYBOARD"
+            }
+          ],
+          "arguments": [
+            {
+              "rawText": "when is the next Northline in Charlottesville Virginia",
+              "textValue": "when is the next Northline in Charlottesville Virginia",
+              "name": "text"
+            }
+          ],
+          "intent": "actions.intent.TEXT"
+        }
+      ],
+      "user": {
+        "lastSeen": "2019-03-24T09:27:38Z",
+        "locale": "en-US",
+        "userId": "ABwppHHuZv9-V5SSWdWySTggylc8W2Qqx5GEng9kpM9F1l55JxOlxXEbYGI2VpgTSyVxWENuLxUGAng0_X0"
+      },
+      "conversation": {
+        "conversationId": "ABwppHGd-YQjAcuBGJ2565SUtEvlmN1hdGc6ncrwIix0QCgzS8baO1v6dur6ZxZn6hWrMG4pqSp4BUo3jhY",
+        "type": "ACTIVE",
+        "conversationToken": "[]"
+      },
+      "availableSurfaces": [
+        {
+          "capabilities": [
+            {
+              "name": "actions.capability.WEB_BROWSER"
+            },
+            {
+              "name": "actions.capability.AUDIO_OUTPUT"
+            },
+            {
+              "name": "actions.capability.SCREEN_OUTPUT"
+            }
+          ]
+        }
+      ]
+    }
+  },
+  "session": "projects/busbuddy-64e11/agent/sessions/ABwppHGd-YQjAcuBGJ2565SUtEvlmN1hdGc6ncrwIix0QCgzS8baO1v6dur6ZxZn6hWrMG4pqSp4BUo3jhY"
+}))
