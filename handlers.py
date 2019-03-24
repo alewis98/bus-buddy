@@ -33,8 +33,9 @@ def uncouple_geo_area(geo):
 
 
 def find_by_key(key_id, field, entities):
-    if not entities:
+    if not entities or len(entities) == 0:
         print("find_by_key passed a None value")
+        print("key_id:", key_id, "field:", field, "entities:", entities)
         return
 
     for entity in entities:
@@ -243,7 +244,7 @@ def get_bus_line_info(intent_request, bus_lines, geo_area, where=False):
                 break
 
     if not matched_route:
-        return "Couldn't find any buses running that route right now"
+        return "I couldn't find any buses running that route right now"
 
     print("Agency:", agency)
     print("Matched route:", matched_route.get('route_id'))
