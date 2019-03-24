@@ -177,10 +177,11 @@ def format_time(arrival):
 
 
 def get_arrival_text(arrival_times):
-    arrival_times = [x for x in arrival_times if x.total_seconds() >= 0]
+    if len(arrival_times) == 0:
+        return "There are no buses arriving soon."
     text = "The next bus " + format_time(arrival_times[0]) + "."
     for i in range(1, len(arrival_times)):
-        text += "\nAnother bus " + format_time(arrival_times[i]) + "."
+        text += " Another bus " + format_time(arrival_times[i]) + "."
     return text
 
 
@@ -215,8 +216,9 @@ def when_is_bus_coming(intent_request, agency_id="", matched_route=None, geo_are
         print("Nearest stop:", nearest_stop.get('stop_id'))
         estimates = get_arrivals_for_stop(agency_id, stop_id=nearest_stop['stop_id'], routes=[matched_route['route_id']])
         print("Esimates:", estimates)
-        arrival_times = get_arrival_time_estimates(estimates)
-        text = get_arrival_text(arrival_times)
+        arrival_time_deltas = get_arrival_time_estimates(estimates)
+        print("Arrival time deltas", arrival_time_deltas)
+        text = get_arrival_text(arrival_time_deltas)
     else:
         text = "Couldn't find any buses running that route right now"
 
@@ -247,7 +249,9 @@ def where_is_next_bus(intent_request, agency_id="", matched_route=None, geo_area
         print("YOUR BUS:", your_bus_id)
         print("MATCHED ROUTE:", matched_route)
         current_stop = get_where_is_next_bus(agency_id, matched_route['route_id'], your_bus_id, stops=stops)
-        text = "The next bus is currently at " + current_stop.get('name')
+        if not current_stop:
+            return "Can't find that bus right now"
+        text = "The next bus is currently at " + str(current_stop.get('name'))
     else:
         text = "Couldn't find any buses running that route right now"
 
