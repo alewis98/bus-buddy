@@ -214,7 +214,7 @@ def convert_address_to_coordinates(address):
 
 
 def get_bus_line_info(intent_request, agency_id="", matched_route=None, geo_area=None, where=False):
-    if agency_id == "":
+    if agency_id == "":  # this is Google
         params = intent_request["queryResult"]["parameters"]
         bus_line = params['bus_line']
         print("Bus line:", bus_line)
@@ -228,6 +228,8 @@ def get_bus_line_info(intent_request, agency_id="", matched_route=None, geo_area
         print("Agency ID:", agency_id)
         route = get_route(agency_id=agency_id, route_name=bus_line)
         matched_route = route if route and route['agency_id'] == int(agency_id) else None
+    else:  # this is Alexa
+        bus_line = matched_route['long_name']
     if matched_route:
         print("Matched route:", matched_route.get('route_id'))
         stops = sort_stops(agency_id, geo_area=geo_area)
