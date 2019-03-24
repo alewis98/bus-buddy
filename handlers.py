@@ -24,12 +24,13 @@ def build_geo_area(latitude, longitude, radius=10000):
     return str(latitude) + "," + str(longitude) + "|" + str(radius)
 
 
-# coordinates for Whyburn: 38.0294814,-78.5193463|1000
-latitude = 38.0294814
-longitude = -78.5193463
-#
-# latitude = 38.
-# longitude = -78.
+# coordinates for Whyburn
+# latitude = 38.0294814
+# longitude = -78.5193463
+
+# coordinates for William and Mary
+latitude = 37.271674
+longitude = -76.7155667
 
 
 def find_by_key(key_id, field, entities):
@@ -55,7 +56,7 @@ def get_agency(geo_area=None, agencies=None):
 
     if len(response.json()['data']) == 0:
         print("NO AGENCY FOUND")
-        exit()
+        return None
 
     agency = response.json()['data'][0]  # assume this is the right one
     return agency
@@ -231,6 +232,9 @@ def get_bus_line_info(intent_request, agency_id="", matched_route=None, geo_area
         geo_area = build_geo_area(latitude, longitude)
         try:
             agency = get_agency(geo_area=geo_area)
+            if not agency:
+                return "That route is very far from your location"
+
             print("AGENCY:", agency)
             agency_id = agency['agency_id']
         except:
@@ -413,7 +417,7 @@ print(on_intent_google({
   "queryResult": {
     "queryText": "when is the next northline",
     "parameters": {
-      "bus_line": "Inner U-Loop",
+      "bus_line": "Carrboro Weaver Street",
       "request_type": "when"
     },
     "allRequiredParamsPresent": True,
