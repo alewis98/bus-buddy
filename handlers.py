@@ -27,10 +27,12 @@ def build_geo_area(latitude, longitude, radius=10000):
 # coordinates for Whyburn: 38.0294814,-78.5193463|1000
 latitude = 38.0294814
 longitude = -78.5193463
+#
+# latitude = 38.
+# longitude = -78.
 
 
 def find_by_key(key_id, field, entities):
-    # pprint(entities)
     for entity in entities:
         if entity[field] == key_id:
             return entity
@@ -64,6 +66,9 @@ def get_route(agency_id, route_name, geo_area=None):
 
     response = requests.get(api_url + ROUTES, headers=headers, params=payload)
     routes = response.json()['data'][agency_id]
+
+    for route in routes:
+        print(route['long_name'])
 
     return find_by_key(route_name, 'long_name', routes)
 
@@ -119,7 +124,7 @@ def get_vehicles(agency_id, routes=None, geo_area=None):
     response = requests.get(api_url + VEHICLES, headers=headers, params=payload)
     vehicles = response.json()['data'][agency_id]
 
-    pprint(vehicles)
+    print([vehicle['vehicle_id'] for vehicle in vehicles])
     print("There are", len(vehicles), "vehicles")
 
     return vehicles
@@ -170,11 +175,11 @@ def format_time(arrival):
     minutes = int(seconds // 60)
     hours   = int(minutes // 60)
     if minutes == 0:
-        return "is arriving now"
+        return " is arriving now"
 
     minutes = minutes % 60
 
-    text = "arrives in "
+    text = " arrives in "
     if hours > 0:
         text += str(hours) + str(" hours " if hours > 1 else " hour")
         if minutes > 0:
@@ -185,17 +190,17 @@ def format_time(arrival):
     return text
 
 
-def get_arrival_text(arrival_times):
+def get_arrival_text(arrival_times, bus_line, stop_name):
     if len(arrival_times) == 0:
         return "There are no buses arriving soon."
-    text = "The next bus " + format_time(arrival_times[0]) + "."
+    text = "The next " + bus_line + format_time(arrival_times[0]) + " at " + stop_name + "."
     for i in range(1, len(arrival_times)):
         text += " Another bus " + format_time(arrival_times[i]) + "."
     return text
 
 
-def get_one_bus_arrival_text(arrival_time):
-    text = "The bus " + format_time(arrival_time) + "."
+def get_one_bus_arrival_text(arrival_time, bus_line, stop_name):
+    text = "The " + bus_line + format_time(arrival_time) + " at " + stop_name + "."
     return text
 
 
@@ -223,10 +228,19 @@ def get_bus_line_info(intent_request, agency_id="", matched_route=None, geo_area
         print("Agency ID:", agency_id)
         route = get_route(agency_id=agency_id, route_name=bus_line)
         matched_route = route if route and route['agency_id'] == int(agency_id) else None
-        print("Matched route:", matched_route.get('route_id'))
     if matched_route:
+        print("Matched route:", matched_route.get('route_id'))
         stops = sort_stops(agency_id, geo_area=geo_area)
-        nearest_stop = stops[0]
+
+        nearest_stop = None
+        for stop in stops:
+            if matched_route['route_id'] in stop['routes']:
+                nearest_stop = stop
+                break
+        if not nearest_stop:
+            return "I couldn't find any stops near you for the " + bus_line
+
+        print("Nearest stop:", nearest_stop['name'])
         estimates = get_arrivals_for_stop(agency_id, stop_id=nearest_stop['stop_id'], routes=[matched_route['route_id']])
         print("Esimates:", estimates)
         arrival_time_deltas = get_arrival_time_estimates(estimates)
@@ -240,9 +254,9 @@ def get_bus_line_info(intent_request, agency_id="", matched_route=None, geo_area
             if not current_stop:
                 return "Can't find that bus right now"
             text = "The next bus is currently at " + str(current_stop.get('name')) + ". "
-            text += get_one_bus_arrival_text(arrival_time_deltas[0])
+            text += get_one_bus_arrival_text(arrival_time_deltas[0], bus_line, nearest_stop['name'])
         else:
-            text = get_arrival_text(arrival_time_deltas)
+            text = get_arrival_text(arrival_time_deltas, bus_line, nearest_stop['name'])
 
     else:
         text = "Couldn't find any buses running that route right now"
@@ -312,8 +326,8 @@ def on_intent_google(intent_request):
     intent = intent_request["queryResult"]["intent"]
 
     params = intent_request.get('queryResult').get('parameters')
+    print("PARAMS:", params)
     request_type = params['request_type']
-    request_type = request_type.lower()
 
     if intent['displayName'] == "GetNextBus":
         if request_type == "when":
@@ -375,14 +389,6 @@ def lambda_handler(event, context):
         return build_response_alexa("I think an error occurred")
 
 
-def results(request):
-    request_json = request.get_json()
-    # request_json = request  # for local testing
-    params = request_json.get('queryResult').get('parameters')
-    request_type = params['request_type'].lower()
-    return on_intent_google(request_json)
-
-
 def handler(request):
     # return response
-    return json.dumps(results(request))
+    return json.dumps(on_intent_google(request.get_json()))
