@@ -410,40 +410,4 @@ def lambda_handler(event, context):
 
 def handler(request):
     # return response
-<<<<<<< HEAD
     return json.dumps(on_intent_google(request.get_json()))
-
-print(on_intent_google({
-  "responseId": "9d2ade87-8ae9-46e7-94df-55d7f7134670",
-  "queryResult": {
-    "queryText": "when is the next northline",
-    "parameters": {
-      "bus_line": "Carrboro Weaver Street",
-      "request_type": "when"
-    },
-    "allRequiredParamsPresent": True,
-    "fulfillmentText": "The Northline is on its way",
-    "fulfillmentMessages": [
-      {
-        "text": {
-          "text": [
-            "The Northline is on its way"
-          ]
-        }
-      }
-    ],
-    "intent": {
-      "name": "projects/busbuddy-64e11/agent/intents/d6f859df-fae2-4c6c-aba6-e2ffdc637fc2",
-      "displayName": "GetNextBus"
-    },
-    "intentDetectionConfidence": 1,
-    "languageCode": "en"
-  },
-  "originalDetectIntentRequest": {
-    "payload": {}
-  },
-  "session": "projects/busbuddy-64e11/agent/sessions/53f2ad62-d27f-3a50-f7b1-4b8c9b358028"
-}))
-=======
-    return json.dumps(on_intent_google(request.get_json()))
->>>>>>> c9cc9473712db1bfd55a6cc59b732f04023ed686
