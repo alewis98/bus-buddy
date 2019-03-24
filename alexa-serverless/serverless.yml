@@ -1,0 +1,21 @@
+# serverless.yml
+
+service: BusBuddy
+
+provider:
+  name: aws
+  runtime: python3.7
+
+functions:
+  busbuddy:
+    handler: handler.lambda_handler
+    events:
+      - alexaSkill: amzn1.ask.skill.c4707413-bbbf-4630-bb5f-f64486c4b4ed
+
+plugins:
+  - serverless-python-requirements
+
+custom:
+  pythonRequirements:
+    dockerizePip: non-linux
+    pythonBin: venv/bin/python3
