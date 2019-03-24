@@ -126,7 +126,10 @@ def get_vehicles(agency_id, routes=None, geo_area=None):
 
 
 def get_vehicle_current_stop(vehicle):
-    return vehicle['arrival_estimates'][0]
+    if len(vehicle['arrival_estimates']) > 0:
+        return vehicle['arrival_estimates'][0]
+    else:
+        return None
 
 
 def get_arrival_estimates(agency_id, routes=None, stops=None):
@@ -205,38 +208,7 @@ def convert_address_to_coordinates(address):
     return response.json()['results'][0]['geometry']['location']
 
 
-
-def when_is_bus_coming(intent_request, agency_id="", matched_route=None, geo_area=None):
-    if agency_id == "":
-        params = intent_request["queryResult"]["parameters"]
-        bus_line = params['bus_line']
-        print("Bus line:", bus_line)
-        geo_area = build_geo_area(latitude, longitude)
-        try:
-            agency = get_agency(geo_area=geo_area)
-            print("AGENCY:", agency)
-            agency_id = agency['agency_id']
-        except:
-            agency_id = '347'
-        print("Agency ID:", agency_id)
-        route = get_route(agency_id=agency_id, route_name=bus_line)
-        matched_route = route if route and route['agency_id'] == int(agency_id) else None
-        print("Matched route:", matched_route.get('route_id'))
-    if matched_route:
-        nearest_stop = sort_stops(agency_id, geo_area=geo_area)[0]
-        print("Nearest stop:", nearest_stop.get('stop_id'))
-        estimates = get_arrivals_for_stop(agency_id, stop_id=nearest_stop['stop_id'], routes=[matched_route['route_id']])
-        print("Esimates:", estimates)
-        arrival_time_deltas = get_arrival_time_estimates(estimates)
-        print("Arrival time deltas", arrival_time_deltas)
-        text = get_arrival_text(arrival_time_deltas)
-    else:
-        text = "Couldn't find any buses running that route right now"
-
-    return text
-
-
-def where_is_next_bus(intent_request, agency_id="", matched_route=None, geo_area=None, where=False):
+def get_bus_line_info(intent_request, agency_id="", matched_route=None, geo_area=None, where=False):
     if agency_id == "":
         params = intent_request["queryResult"]["parameters"]
         bus_line = params['bus_line']
@@ -267,10 +239,10 @@ def where_is_next_bus(intent_request, agency_id="", matched_route=None, geo_area
             current_stop = get_where_is_next_bus(agency_id, matched_route['route_id'], your_bus_id, stops=stops)
             if not current_stop:
                 return "Can't find that bus right now"
-            text = "The next bus is currently at " + str(current_stop.get('name'))
-            text = get_one_bus_arrival_text(arrival_time_deltas)
+            text = "The next bus is currently at " + str(current_stop.get('name')) + ". "
+            text += get_one_bus_arrival_text(arrival_time_deltas[0])
         else:
-            text = get_arrival_text([arrival_time_deltas[0]])
+            text = get_arrival_text(arrival_time_deltas)
 
     else:
         text = "Couldn't find any buses running that route right now"
@@ -324,9 +296,9 @@ def on_intent_alexa(intent_request, session, addr=None):
             matched_route = route
             break
     if intent_name == "GetNextBus":
-        text = where_is_next_bus(intent_request, agency_id=agency_id, matched_route=matched_route, geo_area=geo_area, where=False)
+        text = get_bus_line_info(intent_request, agency_id=agency_id, matched_route=matched_route, geo_area=geo_area, where=False)
     elif intent_name == "WhereIsBus":
-        text = where_is_next_bus(intent_request, agency_id=agency_id, matched_route=matched_route, geo_area=geo_area, where=True)
+        text = get_bus_line_info(intent_request, agency_id=agency_id, matched_route=matched_route, geo_area=geo_area, where=True)
     else:
         return build_response_alexa("Invalid Intent")
     return build_response_alexa(text)
@@ -344,9 +316,9 @@ def on_intent_google(intent_request):
 
     if intent['displayName'] == "GetNextBus":
         if request_type == "when":
-            text = when_is_bus_coming(intent_request)
+            text = get_bus_line_info(intent_request, where=False)
         elif request_type == "where":
-            text = where_is_next_bus(intent_request)
+            text = get_bus_line_info(intent_request, where=True)
         else:
             raise ValueError("Invalid request")
     else:
