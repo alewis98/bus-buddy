@@ -33,9 +33,14 @@ longitude = -78.5193463
 
 
 def find_by_key(key_id, field, entities):
+    if not entities:
+        print("find_by_key passed a None value")
+        return
+
     for entity in entities:
         if entity[field] == key_id:
             return entity
+
     print("couldn't find", key_id)
 
 
@@ -146,12 +151,17 @@ def get_arrival_estimates(agency_id, routes=None, stops=None):
     payload = [x for x in payload if x is not None]
 
     response = requests.get(api_url + ARRIVAL_ESTIMATES, headers=headers, params=payload)
+    print("RESPONSE", response.json())
     return response.json()['data']
 
 
 def get_arrivals_for_stop(agency_id, stop_id, routes=None):
+    print("ROUTES", routes)
+    print("STOP_ID", stop_id)
     arrivals = get_arrival_estimates(agency_id, routes=routes, stops=[stop_id])
-    return find_by_key(stop_id, "stop_id", arrivals)['arrivals']
+    print("ARRIVALS", arrivals)
+    stop_arrivals = find_by_key(stop_id, "stop_id", arrivals)
+    return stop_arrivals['arrivals'] if stop_arrivals else None
 
 
 def get_arrival_time_estimates(arrivals):
@@ -242,9 +252,12 @@ def get_bus_line_info(intent_request, agency_id="", matched_route=None, geo_area
         if not nearest_stop:
             return "I couldn't find any stops near you for the " + bus_line
 
-        print("Nearest stop:", nearest_stop['name'])
+        print("Nearest stop:", nearest_stop['stop_id'])
         estimates = get_arrivals_for_stop(agency_id, stop_id=nearest_stop['stop_id'], routes=[matched_route['route_id']])
         print("Esimates:", estimates)
+        if not estimates or len(estimates) == 0:
+            return "There are no upcoming " + matched_route['long_name'] + " buses near you."
+
         arrival_time_deltas = get_arrival_time_estimates(estimates)
         print("Arrival time deltas", arrival_time_deltas)
 
@@ -394,3 +407,35 @@ def lambda_handler(event, context):
 def handler(request):
     # return response
     return json.dumps(on_intent_google(request.get_json()))
+
+print(on_intent_google({
+  "responseId": "9d2ade87-8ae9-46e7-94df-55d7f7134670",
+  "queryResult": {
+    "queryText": "when is the next northline",
+    "parameters": {
+      "bus_line": "Inner U-Loop",
+      "request_type": "when"
+    },
+    "allRequiredParamsPresent": True,
+    "fulfillmentText": "The Northline is on its way",
+    "fulfillmentMessages": [
+      {
+        "text": {
+          "text": [
+            "The Northline is on its way"
+          ]
+        }
+      }
+    ],
+    "intent": {
+      "name": "projects/busbuddy-64e11/agent/intents/d6f859df-fae2-4c6c-aba6-e2ffdc637fc2",
+      "displayName": "GetNextBus"
+    },
+    "intentDetectionConfidence": 1,
+    "languageCode": "en"
+  },
+  "originalDetectIntentRequest": {
+    "payload": {}
+  },
+  "session": "projects/busbuddy-64e11/agent/sessions/53f2ad62-d27f-3a50-f7b1-4b8c9b358028"
+}))
