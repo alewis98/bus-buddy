@@ -94,7 +94,7 @@ def get_stops(agency_id, geo_area=None, route_id=None):
     if route_id:
         stops = []
         for stop in response.json()['data']:
-            if route_id in stop['routes']
+            if route_id in stop['routes']:
                 stops.append(stop)
         return stops
     else:
