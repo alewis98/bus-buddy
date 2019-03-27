@@ -54,7 +54,7 @@ while True:
     agency = input("Input ID to see routes: ")
     if agency != 'exit':
         routes = get_routes(agency)
-        pprint([r['long_name'] for r in routes])
+        pprint([r['long_name'] for r in routes if r['is_active']])
+        input("Press any key to continue")
     else:
         break
-
