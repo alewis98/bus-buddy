@@ -191,10 +191,10 @@ def convert_address_to_coordinates(address):
         return None
 
     try:
-        address_string = "+".join([address['addressLine1'], \
-                                   address['city'], address['stateOrRegion'], \
+        address_string = "+".join([address['addressLine1'],
+                                   address['city'], address['stateOrRegion'],
                                    address['postalCode'], address['countryCode']])
-    except:
+    except KeyError:
         address_string = "+".join(address.values())
     response = requests.get('https://maps.googleapis.com/maps/api/geocode/json?address=' + address_string + "&key=" + api_key)
     if len(response.json()['results']) == 0:
@@ -335,29 +335,23 @@ def on_intent_google(intent_request):
     print("PARAMS:", params)
     request_type = params['request_type']
 
-    # coordinates for Whyburn:          latitude=38.0294814, longitude=-78.5193463  '
-    #                                   geo_area='38.0294814,-78.5193463|10000'
-    # coordinates for William and Mary: latitude=37.271674, longitude = -76.7155667
-    latitude=38.0294814
-    longitude=-78.5193463
-    # if "location" in params.keys():
-    #     location = params['location']
-    #     print("ADDRESS DETECTED:", location)
-    #
-    #     if type(location) == type(""):
-    #         location = {'addressLine1': "216 Johnson", \
-    #                     'city': "Charlottesvile", \
-    #                     'stateOrRegion': "Virginia", \
-    #                     'postalCode': "22904-2120", \
-    #                     'countryCode': "US"
-    #                     }
-    #
-    #     location = convert_address_to_coordinates(location)
-    #     print("ADDRESS RESOLVED TO:", location)
-    #     if location:
-    #     	latitude  = location['lat']
-    #     	longitude = location['lng']
-    geo_area = build_geo_area(latitude=latitude, longitude=longitude)
+    # coordinates for Whyburn: latitude=38.0294814, longitude=-78.5193463
+    #                          geo_area='38.0294814,-78.5193463|10000'
+    latitude = 38.0294814
+    longitude = -78.5193463
+    if "location" in params.keys():
+        location = params['location']
+        print("ADDRESS DETECTED:", location)
+
+        location = convert_address_to_coordinates(location)
+        print("ADDRESS RESOLVED TO:", location)
+        if location:
+            latitude = location['lat']
+            longitude = location['lng']
+        else:
+            print("Could not convert address to coordinates. Using default coordinates")
+
+    geo_area = build_geo_area(latitude, longitude)
 
     if intent['displayName'] == "GetNextBus":
         if request_type == "when":
@@ -394,7 +388,7 @@ def lambda_handler(event, context):
     supported_interfaces = event["context"]["System"]["device"]["supportedInterfaces"]
     user = event["context"]["System"]["user"]
     gps_permission_status = user["permissions"]["scopes"]["alexa::devices:all:geolocation:read"]["status"]
-    if supported_interfaces.get("Geolocation") != None:
+    if supported_interfaces.get("Geolocation") is not None:
         if gps_permission_status == "DENIED":
             return build_permission_card_response_alexa(["alexa::devices:all:geolocation:read"])
         else:
@@ -420,5 +414,4 @@ def lambda_handler(event, context):
 
 
 def google_handler(request):
-    # return response
     return json.dumps(on_intent_google(request.get_json()))
