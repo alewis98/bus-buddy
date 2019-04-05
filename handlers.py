@@ -145,6 +145,8 @@ def get_arrivals_for_stop(agency_id, stop_id, routes=None):
 
 
 def get_arrival_time_estimates(arrivals):
+    if type(arrivals) is not list:
+        arrivals = [arrivals]
     now = datetime.now()
     return sorted([dateutil.parser.parse(arrival['arrival_at']).replace(tzinfo=None) - now for arrival in arrivals])
 
@@ -277,6 +279,80 @@ def get_next_bus(intent_request, bus_lines, geo_area, where=False):
     return text
 
 
+def get_next_bus_from_bus_arrivals(intent_request, bus_lines, geo_area, where=False):
+    if type(bus_lines) is str:
+        bus_lines = [bus_lines]  # we want to loop through bus routes, not characters of a string
+
+    agencies = make_request(AGENCIES, geo_area=geo_area)
+    if not agencies:
+        return "We can't find any routes near you"
+    print("AGENCIES:", agencies)
+    matched_route = None
+
+    for ag in agencies:
+        ag_id = ag['agency_id']
+        for bus_line in bus_lines:
+            routes = make_request(ROUTES, agencies=ag_id).get(ag_id)
+            route = find_by_key(bus_line, 'long_name', routes)
+            if not route:
+                print("Couldn't find route", bus_line, "in agency", ag_id)
+                continue
+            matched_route = route
+            agency = ag
+            agency_id = ag_id
+            break
+
+    if not matched_route:
+        return "I couldn't find any routes by that name near you"
+
+    print("AGENCY:", agency.get('long_name'))
+    print("MATCHED ROUTE:", matched_route.get('route_id'))
+
+    stops = make_request(STOPS, agencies=agency_id, geo_area=geo_area, routes=matched_route['route_id'])
+    sorted_stops = sort_stops(stops, geo_area)
+
+    nearest_stop = None
+    for stop in sorted_stops:
+        if matched_route['route_id'] in stop['routes']:
+            nearest_stop = stop
+            break
+    if not nearest_stop:
+        return "I couldn't find any stops near you for the " + bus_line
+
+    print("Nearest stop:", nearest_stop['stop_id'], nearest_stop['name'])
+
+    response = make_request(VEHICLES, agencies=agency_id, routes=matched_route['route_id'])
+    vehicles = response.get(agency_id)
+
+    closest_bus_stops_away = 100
+    closest_bus = None
+    for vehicle in vehicles:
+        arrival_estimates = vehicle.get("arrival_estimates")
+        for i, estimate in enumerate(arrival_estimates):
+            if estimate.get("stop_id") == nearest_stop.get("stop_id"):
+                if i < closest_bus_stops_away:
+                    closest_bus_stops_away = i
+                    closest_bus = vehicle
+                break
+
+    if closest_bus is None:
+        return "Couldn't find a bus"
+
+    arrival = find_by_key(nearest_stop['stop_id'], 'stop_id', closest_bus.get("arrival_estimates"))
+
+    arrival_time = get_arrival_time_estimates(arrival)[0]
+
+    vehicle_current_stop = get_vehicle_current_stop(closest_bus)
+    current_stop = find_by_key(vehicle_current_stop.get('stop_id'), 'stop_id', sorted_stops)
+
+    if not current_stop:
+        return "Can't find that bus right now"
+    text = "The next bus is currently at " + str(current_stop.get('name')) + ". "
+    text += get_bus_fullness(closest_bus)
+    text += get_one_bus_arrival_text(arrival_time, bus_line, nearest_stop['name'])
+    return text
+
+
 def build_response_alexa(text):
     response = {
         'version': '1.0',
@@ -339,17 +415,17 @@ def on_intent_google(intent_request):
     #                          geo_area='38.0294814,-78.5193463|10000'
     latitude = 38.0294814
     longitude = -78.5193463
-    if "location" in params.keys():
-        location = params['location']
-        print("ADDRESS DETECTED:", location)
-
-        location = convert_address_to_coordinates(location)
-        print("ADDRESS RESOLVED TO:", location)
-        if location:
-            latitude = location['lat']
-            longitude = location['lng']
-        else:
-            print("Could not convert address to coordinates. Using default coordinates")
+    # if "location" in params.keys():
+    #     location = params['location']
+    #     print("ADDRESS DETECTED:", location)
+    #
+    #     location = convert_address_to_coordinates(location)
+    #     print("ADDRESS RESOLVED TO:", location)
+    #     if location:
+    #         latitude = location['lat']
+    #         longitude = location['lng']
+    #     else:
+    #         print("Could not convert address to coordinates. Using default coordinates")
 
     geo_area = build_geo_area(latitude, longitude)
 
@@ -357,7 +433,7 @@ def on_intent_google(intent_request):
         if request_type == "when":
             text = get_next_bus(intent_request, [params['bus_line']], geo_area=geo_area, where=False)
         elif request_type == "where":
-            text = get_next_bus(intent_request, [params['bus_line']], geo_area=geo_area, where=True)
+            text = get_next_bus_from_bus_arrivals(intent_request, [params['bus_line']], geo_area=geo_area, where=True)
         else:
             raise ValueError("Invalid request")
     else:
@@ -415,3 +491,212 @@ def lambda_handler(event, context):
 
 def google_handler(request):
     return json.dumps(on_intent_google(request.get_json()))
+
+print(on_intent_google({
+  "responseId": "a059d473-0ac4-4542-9794-ad9ae4b2dfb4",
+  "queryResult": {
+    "queryText": "when is the next Northline at Barracks Road Charlottesville Virginia",
+    "parameters": {
+      "bus_line": "Northline",
+      "request_type": "where",
+      "location": {
+        "street-address": "Barracks Road",
+        "city": "Charlottesville",
+        "admin-area": "Virginia"
+      }
+    },
+    "allRequiredParamsPresent": True,
+    "fulfillmentText": "The Northline is on in the way",
+    "fulfillmentMessages": [
+      {
+        "text": {
+          "text": [
+            "The Northline is on in the way"
+          ]
+        }
+      }
+    ],
+    "outputContexts": [
+      {
+        "name": "projects/busbuddy-64e11/agent/sessions/ABwppHFGsgKnRFezct-CQz67b8ih2sac9e6N9gkE6bjgqkOpEcYDKomj0D54QeVm1OeKSLqbbjMUYQ39sSo/contexts/actions_capability_screen_output",
+        "parameters": {
+          "location.original": "Barracks Road Charlottesville Virginia",
+          "request_type": "when",
+          "bus_line": "Northline",
+          "location": {
+            "street-address": "Barracks Road",
+            "street-address.original": "Barracks Road",
+            "street-address.object": {},
+            "city": "Charlottesville",
+            "city.original": "Charlottesville",
+            "city.object": {},
+            "admin-area": "Virginia",
+            "admin-area.original": "Virginia",
+            "admin-area.object": {}
+          },
+          "bus_line.original": "Northline",
+          "request_type.original": "when"
+        }
+      },
+      {
+        "name": "projects/busbuddy-64e11/agent/sessions/ABwppHFGsgKnRFezct-CQz67b8ih2sac9e6N9gkE6bjgqkOpEcYDKomj0D54QeVm1OeKSLqbbjMUYQ39sSo/contexts/actions_capability_audio_output",
+        "parameters": {
+          "location.original": "Barracks Road Charlottesville Virginia",
+          "request_type": "when",
+          "bus_line": "Northline",
+          "location": {
+            "street-address": "Barracks Road",
+            "street-address.original": "Barracks Road",
+            "street-address.object": {},
+            "city": "Charlottesville",
+            "city.original": "Charlottesville",
+            "city.object": {},
+            "admin-area": "Virginia",
+            "admin-area.original": "Virginia",
+            "admin-area.object": {}
+          },
+          "bus_line.original": "Northline",
+          "request_type.original": "when"
+        }
+      },
+      {
+        "name": "projects/busbuddy-64e11/agent/sessions/ABwppHFGsgKnRFezct-CQz67b8ih2sac9e6N9gkE6bjgqkOpEcYDKomj0D54QeVm1OeKSLqbbjMUYQ39sSo/contexts/google_assistant_input_type_keyboard",
+        "parameters": {
+          "location.original": "Barracks Road Charlottesville Virginia",
+          "request_type": "when",
+          "bus_line": "Northline",
+          "location": {
+            "street-address": "Barracks Road",
+            "street-address.original": "Barracks Road",
+            "street-address.object": {},
+            "city": "Charlottesville",
+            "city.original": "Charlottesville",
+            "city.object": {},
+            "admin-area": "Virginia",
+            "admin-area.original": "Virginia",
+            "admin-area.object": {}
+          },
+          "bus_line.original": "Northline",
+          "request_type.original": "when"
+        }
+      },
+      {
+        "name": "projects/busbuddy-64e11/agent/sessions/ABwppHFGsgKnRFezct-CQz67b8ih2sac9e6N9gkE6bjgqkOpEcYDKomj0D54QeVm1OeKSLqbbjMUYQ39sSo/contexts/actions_capability_media_response_audio",
+        "parameters": {
+          "location.original": "Barracks Road Charlottesville Virginia",
+          "request_type": "when",
+          "bus_line": "Northline",
+          "location": {
+            "street-address": "Barracks Road",
+            "street-address.original": "Barracks Road",
+            "street-address.object": {},
+            "city": "Charlottesville",
+            "city.original": "Charlottesville",
+            "city.object": {},
+            "admin-area": "Virginia",
+            "admin-area.original": "Virginia",
+            "admin-area.object": {}
+          },
+          "bus_line.original": "Northline",
+          "request_type.original": "when"
+        }
+      },
+      {
+        "name": "projects/busbuddy-64e11/agent/sessions/ABwppHFGsgKnRFezct-CQz67b8ih2sac9e6N9gkE6bjgqkOpEcYDKomj0D54QeVm1OeKSLqbbjMUYQ39sSo/contexts/actions_capability_web_browser",
+        "parameters": {
+          "location.original": "Barracks Road Charlottesville Virginia",
+          "request_type": "when",
+          "bus_line": "Northline",
+          "location": {
+            "street-address": "Barracks Road",
+            "street-address.original": "Barracks Road",
+            "street-address.object": {},
+            "city": "Charlottesville",
+            "city.original": "Charlottesville",
+            "city.object": {},
+            "admin-area": "Virginia",
+            "admin-area.original": "Virginia",
+            "admin-area.object": {}
+          },
+          "bus_line.original": "Northline",
+          "request_type.original": "when"
+        }
+      }
+    ],
+    "intent": {
+      "name": "projects/busbuddy-64e11/agent/intents/d6f859df-fae2-4c6c-aba6-e2ffdc637fc2",
+      "displayName": "GetNextBus"
+    },
+    "intentDetectionConfidence": 1,
+    "languageCode": "en-us"
+  },
+  "originalDetectIntentRequest": {
+    "source": "google",
+    "version": "2",
+    "payload": {
+      "isInSandbox": True,
+      "surface": {
+        "capabilities": [
+          {
+            "name": "actions.capability.WEB_BROWSER"
+          },
+          {
+            "name": "actions.capability.SCREEN_OUTPUT"
+          },
+          {
+            "name": "actions.capability.MEDIA_RESPONSE_AUDIO"
+          },
+          {
+            "name": "actions.capability.AUDIO_OUTPUT"
+          }
+        ]
+      },
+      "requestType": "SIMULATOR",
+      "inputs": [
+        {
+          "rawInputs": [
+            {
+              "query": "when is the next Northline at Barracks Road Charlottesville Virginia",
+              "inputType": "KEYBOARD"
+            }
+          ],
+          "arguments": [
+            {
+              "rawText": "when is the next Northline at Barracks Road Charlottesville Virginia",
+              "textValue": "when is the next Northline at Barracks Road Charlottesville Virginia",
+              "name": "text"
+            }
+          ],
+          "intent": "actions.intent.TEXT"
+        }
+      ],
+      "user": {
+        "lastSeen": "2019-03-31T06:09:30Z",
+        "locale": "en-US",
+        "userId": "ABwppHHuZv9-V5SSWdWySTggylc8W2Qqx5GEng9kpM9F1l55JxOlxXEbYGI2VpgTSyVxWENuLxUGAng0_X0"
+      },
+      "conversation": {
+        "conversationId": "ABwppHFGsgKnRFezct-CQz67b8ih2sac9e6N9gkE6bjgqkOpEcYDKomj0D54QeVm1OeKSLqbbjMUYQ39sSo",
+        "type": "ACTIVE",
+        "conversationToken": "[]"
+      },
+      "availableSurfaces": [
+        {
+          "capabilities": [
+            {
+              "name": "actions.capability.SCREEN_OUTPUT"
+            },
+            {
+              "name": "actions.capability.WEB_BROWSER"
+            },
+            {
+              "name": "actions.capability.AUDIO_OUTPUT"
+            }
+          ]
+        }
+      ]
+    }
+  },
+  "session": "projects/busbuddy-64e11/agent/sessions/ABwppHFGsgKnRFezct-CQz67b8ih2sac9e6N9gkE6bjgqkOpEcYDKomj0D54QeVm1OeKSLqbbjMUYQ39sSo"
+}
+))
