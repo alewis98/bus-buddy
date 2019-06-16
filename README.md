@@ -39,6 +39,11 @@ If you do use Transloc, Bus Buddy can...
 - A: "Runk Dining Hall and JMW are near your location"
 - Q: Where is the nearest bus stop?
 - A: "Runk Dining Hall is 500 feet from your location"
+- Q: What's the fastest way to get to {destination}?
+- A: "There's an Outer Loop leaving in 2 minutes which will get you there in 10 minutes. 
+     "There's also an Inner Loop leaving in 5 minutes which will get you there in 15 minutes."
+- Q: What's the latest bus I can take to make it to {destination} by {time}?
+- A: "Don't miss the Northline coming in 5 minutes"
 
 Andrew Lewis
 Austin Sullivan
