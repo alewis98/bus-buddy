@@ -1,0 +1,26 @@
+{
+  "actions": [
+    {
+      "description": "Default Welcome Intent",
+      "name": "MAIN",
+      "fulfillment": {
+        "conversationName": "GetBus"
+      },
+      "intent": {
+        "name": "actions.intent.MAIN",
+        "trigger": {
+          "queryPatterns": [
+            "talk to Bus Buddy"
+          ]
+        }
+      }
+    }
+  ],
+  "conversations": {
+    "GetBus": {
+      "name": "GetBus",
+      "url": "http://localhost:3000/fufillment"
+    }
+  },
+  "locale": "en"
+}
