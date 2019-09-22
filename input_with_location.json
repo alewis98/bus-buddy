@@ -4,7 +4,7 @@
     "queryText": "when is the next Northline at Barracks Road Charlottesville Virginia",
     "parameters": {
       "bus_line": "Northline",
-      "request_type": "when",
+      "request_type": "where",
       "location": {
         "street-address": "Barracks Road",
         "city": "Charlottesville",
